@@ -18,7 +18,9 @@ class SimpleConsumer extends Phirehose
      *       enqueued and processed asyncronously from the collection process. 
      */
     $data = json_decode($status, true);
-    print $data['user']['screen_name'] . ': ' . urldecode($data['text']) . "\n";
+    if (is_array($data)) {
+      print $data['user']['screen_name'] . ': ' . urldecode($data['text']) . "\n";
+    }
   }
 }
 

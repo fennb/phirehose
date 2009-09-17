@@ -18,7 +18,7 @@ abstract class Phirehose
   const METHOD_SAMPLE   = 'sample';
   const METHOD_RETWEET  = 'retweet';
   const METHOD_FIREHOSE = 'firehose';
-  const USER_AGENT      = 'Phirehose/$Rev$ +http://code.google.com/p/phirehose/';
+  const USER_AGENT      = 'Phirehose/0.1 +http://code.google.com/p/phirehose/';
   
   /**
    * Member Attribs
@@ -95,20 +95,43 @@ abstract class Phirehose
    * 
    * @see handleStatus()
    * @param boolean $reconnect Reconnects as per recommended   
+   * @throws ErrorException
    */
   public function consume($reconnect = true) {
     $this->disconnect();
     $this->connect();
     
-    while ($lengthBytes = fgets($this->conn, 64)) {
-      $status = fread($this->conn, $lengthBytes);
-      $this->enqueueStatus($status);
-    }
+    // Setup stream vars
+    $r = array($this->conn);
+    $w = NULL;
+    $e = NULL;
     
-    die("Exited!\n");
+    // Max iteration time is 1 second (significantly less for high volume streams)
+    while (($numChanged = stream_select($r, $w, $e, 2)) !== false && $this->conn !== NULL) {
+      $statusLength = intval(fgets($this->conn, 6)); // Read length delimiter
+      if ($statusLength > 0) {
+        // Read status bytes and enqueue
+        $status = '';
+        $bytesLeft = $statusLength;
+        while ($bytesLeft = ($statusLength - strlen($status)) && !feof($this->conn)) {
+          $status .= fread($this->conn, $bytesLeft);
+        }
+        // Enqueue
+        $this->enqueueStatus($status);
+      } else {
+        // Timeout/no data
+      }
+    }
+    $error = socket_last_error($this->conn);    
+    $this->log('Phirehose: error occured: ' . $error);
+    die("Error occured: " . $error . "\n");
     
   }
   
+  /**
+   * Connects to the stream URL using the configured method.
+   * @throws ErrorException
+   */
   protected function connect() {
     // Construct various HTTP components
     $url = self::URL_BASE . $this->method . '.' . $this->format . '?delimited=length';
@@ -161,6 +184,9 @@ abstract class Phirehose
       $e = error_get_last();
       throw new ErrorException($e['message'], 0, $e['type'], $e['file'], $e['line']);
     }
+    
+    // Ensure set to non-blocking (important) 
+    stream_set_blocking($this->conn, 0);
   }
   
   protected function disconnect() {
@@ -168,6 +194,7 @@ abstract class Phirehose
       $this->log('Phirehose: Closing connection.');
       fclose($this->conn);
     }
+    $this->conn = NULL;
   }
   
   /**
