@@ -1,9 +1,9 @@
 <?php
 require_once('../lib/Phirehose.php');
 /**
- * Simple example of using Phirehose to display the 'sample' twitter stream. 
+ * Example of using Phirehose to display the 'sample' twitter stream. 
  */
-class SimpleConsumer extends Phirehose
+class SampleConsumer extends Phirehose
 {
   /**
    * Enqueue each status
@@ -18,12 +18,12 @@ class SimpleConsumer extends Phirehose
      *       enqueued and processed asyncronously from the collection process. 
      */
     $data = json_decode($status, true);
-    if (is_array($data)) {
+    if (is_array($data) && isset($data['user']['screen_name'])) {
       print $data['user']['screen_name'] . ': ' . urldecode($data['text']) . "\n";
     }
   }
 }
 
 // Start streaming
-$sc = new SimpleConsumer('username', 'password', Phirehose::METHOD_SAMPLE);
+$sc = new SampleConsumer('username', 'password', Phirehose::METHOD_SAMPLE);
 $sc->consume();

@@ -11,14 +11,15 @@ abstract class Phirehose
   /**
    * Class constants
    */
-  const URL_BASE        = 'http://stream.twitter.com/1/statuses/';
-  const FORMAT_JSON     = 'json';
-  const FORMAT_XML      = 'xml';
-  const METHOD_FILTER   = 'filter';
-  const METHOD_SAMPLE   = 'sample';
-  const METHOD_RETWEET  = 'retweet';
-  const METHOD_FIREHOSE = 'firehose';
-  const USER_AGENT      = 'Phirehose/0.1 +http://code.google.com/p/phirehose/';
+  const URL_BASE         = 'http://stream.twitter.com/1/statuses/';
+  const FORMAT_JSON      = 'json';
+  const FORMAT_XML       = 'xml';
+  const METHOD_FILTER    = 'filter';
+  const METHOD_SAMPLE    = 'sample';
+  const METHOD_RETWEET   = 'retweet';
+  const METHOD_FIREHOSE  = 'firehose';
+  const USER_AGENT       = 'Phirehose/0.1 +http://code.google.com/p/phirehose/';
+  const FILTER_UPD_LIMIT = 120;
   
   /**
    * Member Attribs
@@ -31,6 +32,12 @@ abstract class Phirehose
   protected $followIds;
   protected $trackWords;
   protected $conn;
+  protected $filterChanged;
+  // State vars
+  protected $statusRate;
+  // Config type vars - override in subclass if desired
+  protected $idleTimeout = 5;
+  protected $avgPeriod = 60;
 
   /**
    * Create a new Phirehose object attached to the appropriate twitter stream method. 
@@ -62,7 +69,21 @@ abstract class Phirehose
    */
   public function setFollow($userIds)
   {
+    sort($userIds); // Non-optimal but necessary 
+    if ($this->followIds != NULL && $this->followIds != $userIds) {
+      $this->filterChanged = TRUE;
+    }
     $this->followIds = $userIds;
+  }
+  
+  /**
+   * Returns an array of followed Twitter userIds (integers)
+   *
+   * @return array
+   */
+  public function getFollow()
+  {
+    return $this->followIds;
   }
   
   /**
@@ -74,8 +95,23 @@ abstract class Phirehose
    *
    * @param array $trackWords
    */
-  public function setTrack($trackWords) {
+  public function setTrack($trackWords)
+  {
+    sort($trackWords); // Non-optimal, but necessary
+    if ($this->trackWords != NULL && $this->trackWords != $trackWords) {
+      $this->filterChanged = TRUE;
+    }
     $this->trackWords = $trackWords;
+  }
+  
+  /**
+   * Returns an array of keywords being tracked 
+   *
+   * @return array
+   */
+  public function getTrack()
+  {
+    return $this->trackWords;
   }
   
   /**
@@ -101,29 +137,55 @@ abstract class Phirehose
     $this->disconnect();
     $this->connect();
     
-    // Setup stream vars
+    // Init
     $r = array($this->conn);
     $w = NULL;
     $e = NULL;
+    $statusCount = 0;
+    $lastAverage = time();
+    $lastFilterUpd = time();
     
-    // Max iteration time is 1 second (significantly less for high volume streams)
-    while (($numChanged = stream_select($r, $w, $e, 2)) !== false && $this->conn !== NULL) {
+    // We use a blocking-select with timeout, to allow us to continue processing on idle streams
+    while (($numChanged = stream_select($r, $w, $e, $this->idleTimeout)) !== false && $this->conn !== NULL) {
       $statusLength = intval(fgets($this->conn, 6)); // Read length delimiter
       if ($statusLength > 0) {
         // Read status bytes and enqueue
-        $status = '';
-        $bytesLeft = $statusLength;
-        while ($bytesLeft = ($statusLength - strlen($status)) && !feof($this->conn)) {
-          $status .= fread($this->conn, $bytesLeft);
+        $buff = '';
+        while ($bytesLeft = ($statusLength - strlen($buff)) && !feof($this->conn)) {
+          $buff .= fread($this->conn, $bytesLeft);
         }
-        // Enqueue
-        $this->enqueueStatus($status);
+        // Accrue/enqueue and track time spent enqueing
+        $statusCount ++;
+        $enqueueStart = microtime(TRUE);
+        $this->enqueueStatus($buff);
+        $enqueueElapsed = microtime(TRUE) - $enqueueStart;
       } else {
         // Timeout/no data
+        
       }
-    }
+      // Calc counter averages 
+      $avgElapsed = time() - $lastAverage;
+      if ($avgElapsed >= $this->avgPeriod) {
+        // Calc tweets-per-second
+        $this->statusRate = round($statusCount / $avgElapsed, 0);
+        // Reset
+        $statusCount = 0;
+        $lastAverage = time();
+        // Log it
+        $this->log('Phirehose rate: ' . $this->statusRate . ' status/sec over ' . $this->avgPeriod . ' seconds');
+      }
+      // Check if filter is ready + allowed to be updated (reconnect)
+      if ($this->filterChanged == TRUE && (time() - $lastFilterUpd) >= self::FILTER_UPD_LIMIT) {
+        $this->log('Phirehose: Updating filter predicates.');
+        $this->disconnect();
+        $this->connect();
+      }
+      
+    } // End while-stream-activity
+    
+    // Socket error has occured
     $error = socket_last_error($this->conn);    
-    $this->log('Phirehose: error occured: ' . $error);
+    $this->log('Phirehose error occured: ' . $error);
     die("Error occured: " . $error . "\n");
     
   }
@@ -147,9 +209,11 @@ abstract class Phirehose
     
     // Filter takes additional parameters
     if ($this->method == self::METHOD_FILTER && count($this->trackWords) > 0) {
+      $this->trackWords;
       $requestParams['track'] = implode(',', $this->trackWords);
     }
     if ($this->method == self::METHOD_FILTER && count($this->followIds) > 0) {
+      $this->followIds;
       $requestParams['follow'] = implode(',', $this->followIds); 
     }
     if ($this->count > 0) {
@@ -187,14 +251,25 @@ abstract class Phirehose
     
     // Ensure set to non-blocking (important) 
     stream_set_blocking($this->conn, 0);
+    
+    // Connect always causes the filterChanged status to be cleared
+    $this->filterChanged = FALSE;
   }
   
-  protected function disconnect() {
-    if (is_resource($this->conn)) {
-      $this->log('Phirehose: Closing connection.');
-      fclose($this->conn);
-    }
-    $this->conn = NULL;
+  /**
+   * Method called as frequently as practical (every 5+ seconds) that is responsible for checking if filter predicates
+   * (ie: track words or follow IDs) have changed. If they have, they should be set using the setTrack() and setFollow()
+   * methods respectively. 
+   * 
+   * This should be implemented/overridden in any subclass implementing the FILTER method.
+   *
+   * @see setTrack()
+   * @see setFollow()
+   * @see Phirehose::METHOD_FILTER
+   */
+  protected function updateFilterPredicates()
+  {
+    // Override in subclass
   }
   
   /**
@@ -210,11 +285,23 @@ abstract class Phirehose
   }
 
   /**
+   * Performs disconnect from stream (if connected) and cleanup
+   */
+  private function disconnect()
+  {
+    if (is_resource($this->conn)) {
+      $this->log('Phirehose: Closing connection.');
+      fclose($this->conn);
+    }
+    $this->conn = NULL;
+  }
+  
+  /**
    * This is the one and only method that must be implemented additionally. As per the streaming API documentation,
    * statuses should NOT be processed within the same process that is performing collection 
    *
    * @param string $status
    */
-  abstract function enqueueStatus($status);
+  abstract public function enqueueStatus($status);
   
 } // End of class
