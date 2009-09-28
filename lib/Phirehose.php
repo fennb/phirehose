@@ -137,25 +137,31 @@ abstract class Phirehose
     $this->disconnect();
     $this->connect();
     
-    // Init
-    $r = array($this->conn);
-    $w = NULL;
-    $e = NULL;
+    // Sep vars needed for each variable pointers or stream_select seems to behave strangely
+    $rp1 = array($this->conn);
+    $wp1 = NULL;
+    $ep1 = NULL;
+    $rp2 = array($this->conn);
+    $wp2 = NULL;
+    $ep2 = NULL;
+
+    // Init state
     $statusCount = 0;
     $lastAverage = time();
     $lastFilterUpd = time();
     
     // We use a blocking-select with timeout, to allow us to continue processing on idle streams
-    while (($numChanged = stream_select($r, $w, $e, $this->idleTimeout)) !== false && $this->conn !== NULL) {
-      $statusLength = intval(fgets($this->conn, 6)); // Read length delimiter
+    while ($this->conn !== NULL && !feof($this->conn) && ($numChanged = stream_select($rp1, $wp1, $ep1, $this->idleTimeout)) !== false) {
+      // Read status length delimiter
+      $statusLength = intval(stream_get_line($this->conn, 4096, "\r\n"));
       if ($statusLength > 0) {
         // Read status bytes and enqueue
         $buff = '';
         $bytesLeft = $statusLength;
-        while ($bytesLeft > 0 && !feof($this->conn) && ($numChanged = stream_select($r, $w, $e, 0, 10000)) !== false) {
-          $buff .= fread($this->conn, $bytesLeft);
+        do {
+          $buff .= fread($this->conn, $bytesLeft); // Read until all bytes are read into buffer
           $bytesLeft = ($statusLength - strlen($buff));
-        }
+        } while ($bytesLeft > 0 && $this->conn !== NULL && !feof($this->conn) && ($numChanged = stream_select($rp2, $wp2, $ep2, 0, 20000)) !== false);
         // Accrue/enqueue and track time spent enqueing
         $statusCount ++;
         $enqueueStart = microtime(TRUE);
