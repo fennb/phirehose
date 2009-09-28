@@ -151,8 +151,10 @@ abstract class Phirehose
       if ($statusLength > 0) {
         // Read status bytes and enqueue
         $buff = '';
-        while ($bytesLeft = ($statusLength - strlen($buff)) && !feof($this->conn)) {
+        $bytesLeft = $statusLength;
+        while ($bytesLeft > 0 && !feof($this->conn) && ($numChanged = stream_select($r, $w, $e, 0, 10000)) !== false) {
           $buff .= fread($this->conn, $bytesLeft);
+          $bytesLeft = ($statusLength - strlen($buff));
         }
         // Accrue/enqueue and track time spent enqueing
         $statusCount ++;
@@ -160,7 +162,8 @@ abstract class Phirehose
         $this->enqueueStatus($buff);
         $enqueueElapsed = microtime(TRUE) - $enqueueStart;
       } else {
-        // Timeout/no data
+        // Timeout/no data after idleTimeout seconds
+        
         
       }
       // Calc counter averages 
