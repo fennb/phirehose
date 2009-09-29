@@ -26,7 +26,7 @@ class DynamicTrackConsumer extends Phirehose
    * of shared medium (ie: memcache, DB, filesystem) to determine if the filter has changed and set appropriately. The
    * speed of this method will affect how quickly you can update filters. 
    */
-  public function updateFilterPredicates()
+  public function checkFilterPredicates()
   {
     // This is all that's required, Phirehose will detect the change and reconnect as soon as possible
     $randWord1 = $this->myTrackWords[rand(0, 3)];
