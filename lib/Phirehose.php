@@ -1,9 +1,11 @@
 <?php
 /**
- * Please read: http://apiwiki.twitter.com/Streaming-API-Documentation carefully before using.
+ * Note: This is ALPHA software! - Please read the following carefully before using: 
+ *  - http://code.google.com/p/phirehose/wiki/Introduction
+ *  - http://apiwiki.twitter.com/Streaming-API-Documentation 
  * 
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
- * @version ($Id$)
+ * @version 0.1.0 ($Id$)
  */
 abstract class Phirehose
 {
