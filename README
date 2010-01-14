@@ -1,1 +1,10 @@
 See: http://code.google.com/p/phirehose/
+
+0.2.0 (2010-01-14)
+------------------
+ - Added changelog :)
+ - Added locations functionality for use with the Twitter Geotagging API
+
+0.1.0 (2009-09-30) 
+------------------
+ - Initial public release

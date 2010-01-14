@@ -1,11 +1,11 @@
 <?php
 /**
- * Note: This is ALPHA software! - Please read the following carefully before using: 
+ * Note: This is BETA software! - Please read the following carefully before using: 
  *  - http://code.google.com/p/phirehose/wiki/Introduction
  *  - http://apiwiki.twitter.com/Streaming-API-Documentation 
  * 
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
- * @version 0.1.0 ($Id$)
+ * @version 0.2.0 ($Id$)
  */
 abstract class Phirehose
 {
@@ -20,13 +20,14 @@ abstract class Phirehose
   const METHOD_SAMPLE    = 'sample';
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
-  const USER_AGENT       = 'Phirehose/0.1.0 +http://code.google.com/p/phirehose/';
+  const USER_AGENT       = 'Phirehose/0.1.1 +http://code.google.com/p/phirehose/';
   const FILTER_CHECK_MIN = 5;
   const FILTER_UPD_MIN   = 120;
   const TCP_BACKOFF      = 1;
   const TCP_BACKOFF_MAX  = 16;
   const HTTP_BACKOFF     = 10;
   const HTTP_BACKOFF_MAX = 240;
+  const EARTH_RADIUS_KM  = 6371;
   
   
   /**
@@ -39,6 +40,7 @@ abstract class Phirehose
   protected $count;
   protected $followIds;
   protected $trackWords;
+  protected $locationBoxes;
   protected $conn;
   // State vars
   protected $filterChanged;
@@ -123,6 +125,113 @@ abstract class Phirehose
   public function getTrack()
   {
     return $this->trackWords;
+  }
+  
+  /**
+   * Specifies a set of bounding boxes to track as an array of 4 element lon/lat pairs denoting <south-west point>, 
+   * <north-east point>. Only tweets that are both created using the Geotagging API and are placed from within a tracked
+   * bounding box will be included in the stream. The user's location field is not used to filter tweets. Bounding boxes
+   * are logical ORs and must be less than or equal to 1 degree per side. A locations parameter may be combined with 
+   * track parameters, but note that all terms are logically ORd.
+   * 
+   * NOTE: The argument order is Longitude/Latitude (to match the Twitter API and GeoJSON specifications).
+   * 
+   * Applies to: METHOD_FILTER
+   * 
+   * See: http://apiwiki.twitter.com/Streaming-API-Documentation#locations
+   *
+   * Eg: 
+   *  setLocations(array(
+   *      array(-122.75, 36.8, -121.75, 37.8), // San Francisco
+   *      array(-74, 40, -73, 41),             // New York 
+   *  ));
+   * 
+   * @param array $boundingBoxes
+   */
+  public function setLocations($boundingBoxes)
+  {
+    sort($boundingBoxes); // Non-optimal, but necessary
+    // Flatten to single dimensional array
+    $locationBoxes = array();
+    foreach ($boundingBoxes as $boundingBox) {
+      // Sanity check
+      if (count($boundingBox) != 4) {
+        // Invalid - Not much we can do here but log error
+        $this->log('Phirehose: Invalid location bounding box: [' . implode(', ', $boundingBox) . ']');
+        return FALSE;
+      }
+      // Append this lat/lon pairs to flattened array
+      $locationBoxes = array_merge($locationBoxes, $boundingBox);
+    }
+    // If it's changed, make note
+    if ($this->locationBoxes != NULL && $this->locationBoxes != $locationBoxes) {
+      $this->filterChanged = TRUE;
+    }
+    // Set flattened value
+    $this->locationBoxes = $locationBoxes;
+  }
+  
+  /**
+   * Returns an array of 4 element arrays that denote the monitored location bounding boxes for tweets using the 
+   * Geotagging API.
+   *
+   * @see setLocations()
+   * @return array
+   */
+  public function getLocations() {
+    if ($this->locationBoxes == NULL) {
+      return NULL;
+    }
+    $locationBoxes = $this->locationBoxes; // Copy array
+    $ret = array();
+    while (count($locationBoxes) >= 4) {
+      $ret[] = array_splice($locationBoxes, 0, 4); // Append to ret array in blocks of 4
+    }
+    return $ret;
+  }
+  
+  /**
+   * Convenience method that sets location bounding boxes by an array of lon/lat/radius sets, rather than manually 
+   * specified bounding boxes. Each array element should contain 3 element subarray containing a latitude, longitude and
+   * radius. Radius is specified in kilometers and is approximate (as boxes are square).
+   *
+   * NOTE: The argument order is Longitude/Latitude (to match the Twitter API and GeoJSON specifications).
+   * 
+   * Eg: 
+   *  setLocationsByCircle(array(
+   *      array(144.9631, -37.8142, 30), // Melbourne, 3km radius
+   *      array(-0.1262, 51.5001, 25),   // London 10km radius 
+   *  ));
+   * 
+   *  
+   * @see setLocations()
+   * @param array
+   */
+  public function setLocationsByCircle($locations) {
+    $boundingBoxes = array();
+    foreach ($locations as $locTriplet) {
+      // Sanity check
+      if (count($locTriplet) != 3) {
+        // Invalid - Not much we can do here but log error
+        $this->log('Phirehose: Invalid location triplet for ' . __METHOD__ . ': [' . implode(', ', $locTriplet) . ']');
+        return FALSE;
+      }
+      list($lon, $lat, $radius) = $locTriplet;
+
+      // Calc bounding boxes
+      $maxLat = round($lat + rad2deg($radius / self::EARTH_RADIUS_KM), 2);
+      $minLat = round($lat - rad2deg($radius / self::EARTH_RADIUS_KM), 2);
+      // Compensate for degrees longitude getting smaller with increasing latitude
+      $maxLon = round($lon + rad2deg($radius / self::EARTH_RADIUS_KM / cos(deg2rad($lat))), 2);
+      $minLon = round($lon - rad2deg($radius / self::EARTH_RADIUS_KM / cos(deg2rad($lat))), 2);
+      // Add to bounding box array
+      $boundingBoxes[] = array($minLon, $minLat, $maxLon, $maxLat);
+      // Debugging is handy
+      $this->log('Phirehose: Resolved location circle [' . $lon . ', ' . $lat . ', r: ' . $radius . '] -> bbox: [' . 
+        $minLon . ', ' . $minLat . ', ' . $maxLon . ', ' . $maxLat . ']');          
+    }
+    // Set by bounding boxes
+    $this->setLocations($boundingBoxes);
   }
   
   /**
@@ -258,12 +367,13 @@ abstract class Phirehose
     
     // Filter takes additional parameters
     if ($this->method == self::METHOD_FILTER && count($this->trackWords) > 0) {
-      $this->trackWords;
       $requestParams['track'] = implode(',', $this->trackWords);
     }
     if ($this->method == self::METHOD_FILTER && count($this->followIds) > 0) {
-      $this->followIds;
       $requestParams['follow'] = implode(',', $this->followIds); 
+    }
+    if ($this->method == self::METHOD_FILTER && count($this->locationBoxes) > 0) {
+      $requestParams['locations'] = implode(',', $this->locationBoxes); 
     }
     if ($this->count > 0) {
       $requestParams['count'] = $this->count;    
