@@ -1,5 +1,11 @@
 See: http://code.google.com/p/phirehose/
 
+0.2.1 (2010-01-19)
+------------------
+ - Fixed UserAgent string
+ - Removed per-entry log prefixes and moved to common log() method
+ - Added "ghetto queue" example
+
 0.2.0 (2010-01-14)
 ------------------
  - Added changelog :)

@@ -20,7 +20,7 @@ abstract class Phirehose
   const METHOD_SAMPLE    = 'sample';
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
-  const USER_AGENT       = 'Phirehose/0.1.1 +http://code.google.com/p/phirehose/';
+  const USER_AGENT       = 'Phirehose/0.2.1 +http://code.google.com/p/phirehose/';
   const FILTER_CHECK_MIN = 5;
   const FILTER_UPD_MIN   = 120;
   const TCP_BACKOFF      = 1;
@@ -157,7 +157,7 @@ abstract class Phirehose
       // Sanity check
       if (count($boundingBox) != 4) {
         // Invalid - Not much we can do here but log error
-        $this->log('Phirehose: Invalid location bounding box: [' . implode(', ', $boundingBox) . ']');
+        $this->log('Invalid location bounding box: [' . implode(', ', $boundingBox) . ']');
         return FALSE;
       }
       // Append this lat/lon pairs to flattened array
@@ -213,7 +213,7 @@ abstract class Phirehose
       // Sanity check
       if (count($locTriplet) != 3) {
         // Invalid - Not much we can do here but log error
-        $this->log('Phirehose: Invalid location triplet for ' . __METHOD__ . ': [' . implode(', ', $locTriplet) . ']');
+        $this->log('Invalid location triplet for ' . __METHOD__ . ': [' . implode(', ', $locTriplet) . ']');
         return FALSE;
       }
       list($lon, $lat, $radius) = $locTriplet;
@@ -227,8 +227,8 @@ abstract class Phirehose
       // Add to bounding box array
       $boundingBoxes[] = array($minLon, $minLat, $maxLon, $maxLat);
       // Debugging is handy
-      $this->log('Phirehose: Resolved location circle [' . $lon . ', ' . $lat . ', r: ' . $radius . '] -> bbox: [' . 
-        $minLon . ', ' . $minLat . ', ' . $maxLon . ', ' . $maxLat . ']');          
+      $this->log('Resolved location circle [' . $lon . ', ' . $lat . ', r: ' . $radius . '] -> bbox: [' . $minLon . 
+        ', ' . $minLat . ', ' . $maxLon . ', ' . $maxLat . ']');          
     }
     // Set by bounding boxes
     $this->setLocations($boundingBoxes);
@@ -309,7 +309,7 @@ abstract class Phirehose
           $enqueueTimeMS = ($statusCount > 0) ? round($enqueueSpent / $statusCount * 1000, 2) : 0;
           // Cal time spent total in filter predicate checking
           $filterCheckTimeMS = ($filterCheckCount > 0) ? round($filterCheckSpent / $filterCheckCount * 1000, 2) : 0;
-          $this->log('Phirehose rate: ' . $this->statusRate . ' status/sec (' . $statusCount . ' total), avg ' . 
+          $this->log('Consume rate: ' . $this->statusRate . ' status/sec (' . $statusCount . ' total), avg ' . 
             'enqueueStatus(): ' . $enqueueTimeMS . 'ms, avg checkFilterPredicates(): ' . $filterCheckTimeMS . 'ms (' . 
             $filterCheckCount . ' total) over ' . $this->avgPeriod . ' seconds.');
           // Reset
@@ -326,7 +326,7 @@ abstract class Phirehose
         }
         // Check if filter is ready + allowed to be updated (reconnect)
         if ($this->filterChanged == TRUE && (time() - $lastFilterUpd) >= self::FILTER_UPD_MIN) {
-          $this->log('Phirehose: Updating filter predicates (reconnecting).');
+          $this->log('Updating filter predicates (reconnecting).');
           $lastFilterUpd = time();
           $this->reconnect();
           $fdr = array($this->conn); // Ugly, but required
@@ -386,7 +386,7 @@ abstract class Phirehose
     do {
 
       // Debugging is useful
-      $this->log('Phirehose: Connecting to stream: ' . $url . ' with params: ' . str_replace("\n", '', 
+      $this->log('Connecting to twitter stream: ' . $url . ' with params: ' . str_replace("\n", '', 
         var_export($requestParams, TRUE)));
       
       /**
@@ -402,12 +402,13 @@ abstract class Phirehose
         $connectFailures ++;
         if ($connectFailures > $this->connectFailuresMax) {
           $msg = 'Connection failure limit exceeded with ' . $connectFailures . ' failures. Last error: ' . $errStr;
-          $this->log('Phirehose: ' . $msg);
+          $this->log($msg);
           throw new ErrorException($msg); // We eventually throw an exception for other code to handle          
         }
         // Increase retry/backoff up to max
         $tcpRetry = ($tcpRetry < self::TCP_BACKOFF_MAX) ? $tcpRetry * 2 : self::TCP_BACKOFF_MAX;
-        $this->log('Phirehose: Failed to connect to stream: ' . $errStr . ' (' . $errNo . '). Sleeping for ' . $tcpRetry . ' seconds.');
+        $this->log('Failed to connect to stream: ' . $errStr . ' (' . $errNo . '). Sleeping for ' . $tcpRetry . 
+          ' seconds.');
         sleep($tcpRetry);
         continue;
       }
@@ -456,12 +457,12 @@ abstract class Phirehose
         // Have we exceeded maximum failures?
         if ($connectFailures > $this->connectFailuresMax) {
           $msg = 'Connection failure limit exceeded with ' . $connectFailures . ' failures. Last error: ' . $errStr;
-          $this->log('Phirehose: ' . $msg);
+          $this->log($msg);
           throw new ErrorException($msg); // We eventually throw an exception for other code to handle          
         }
         // Increase retry/backoff up to max
         $httpRetry = ($httpRetry < self::HTTP_BACKOFF_MAX) ? $httpRetry * 2 : self::HTTP_BACKOFF_MAX;
-        $this->log('Phirehose: Failed to connect to stream: ' . $errStr . '. Sleeping for ' . $httpRetry . ' seconds.');
+        $this->log('Failed to connect to stream: ' . $errStr . '. Sleeping for ' . $httpRetry . ' seconds.');
         sleep($httpRetry);
         continue;
         
@@ -506,7 +507,7 @@ abstract class Phirehose
    */
   protected function log($message)
   {
-    @error_log($message, 0);
+    @error_log('Phirehose: ' . $message, 0);
   }
 
   /**
@@ -515,7 +516,7 @@ abstract class Phirehose
   private function disconnect()
   {
     if (is_resource($this->conn)) {
-      $this->log('Phirehose: Closing connection.');
+      $this->log('Closing Phirehose connection.');
       fclose($this->conn);
     }
     $this->conn = NULL;
