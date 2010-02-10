@@ -1,5 +1,12 @@
 See: http://code.google.com/p/phirehose/
 
+0.2.2 (2010-02-10)
+------------------
+ - Fixed @version tag
+ - Improved error logging
+ - Improved connection validity check
+ - Added ghetto-queue-consume example
+
 0.2.1 (2010-01-19)
 ------------------
  - Fixed UserAgent string

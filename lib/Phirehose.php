@@ -1,11 +1,13 @@
 <?php
 /**
- * Note: This is BETA software! - Please read the following carefully before using: 
+ * A class that makes it easy to connect to and consume the Twitter stream via the Streaming API.
+ * 
+ * Note: This is beta software - Please read the following carefully before using: 
  *  - http://code.google.com/p/phirehose/wiki/Introduction
  *  - http://apiwiki.twitter.com/Streaming-API-Documentation 
  * 
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
- * @version 0.2.0 ($Id$)
+ * @version 0.2.2 ($Id$)
  */
 abstract class Phirehose
 {
@@ -20,7 +22,7 @@ abstract class Phirehose
   const METHOD_SAMPLE    = 'sample';
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
-  const USER_AGENT       = 'Phirehose/0.2.1 +http://code.google.com/p/phirehose/';
+  const USER_AGENT       = 'Phirehose/0.2.2 +http://code.google.com/p/phirehose/';
   const FILTER_CHECK_MIN = 5;
   const FILTER_UPD_MIN   = 120;
   const TCP_BACKOFF      = 1;
@@ -398,7 +400,7 @@ abstract class Phirehose
       @$this->conn = fsockopen($scheme . $urlParts['host'], 80, $errNo, $errStr, $this->connectTimeout);
   
       // No go - handle errors/backoff
-      if (!$this->conn) {
+      if (!$this->conn || !is_resource($this->conn)) {
         $connectFailures ++;
         if ($connectFailures > $this->connectFailuresMax) {
           $msg = 'Connection failure limit exceeded with ' . $connectFailures . ' failures. Last error: ' . $errStr;
@@ -407,8 +409,8 @@ abstract class Phirehose
         }
         // Increase retry/backoff up to max
         $tcpRetry = ($tcpRetry < self::TCP_BACKOFF_MAX) ? $tcpRetry * 2 : self::TCP_BACKOFF_MAX;
-        $this->log('Failed to connect to stream: ' . $errStr . ' (' . $errNo . '). Sleeping for ' . $tcpRetry . 
-          ' seconds.');
+        $this->log('TCP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' .
+          $errStr . ' (' . $errNo . '). Sleeping for ' . $tcpRetry . ' seconds.');
         sleep($tcpRetry);
         continue;
       }
@@ -462,7 +464,8 @@ abstract class Phirehose
         }
         // Increase retry/backoff up to max
         $httpRetry = ($httpRetry < self::HTTP_BACKOFF_MAX) ? $httpRetry * 2 : self::HTTP_BACKOFF_MAX;
-        $this->log('Failed to connect to stream: ' . $errStr . '. Sleeping for ' . $httpRetry . ' seconds.');
+        $this->log('HTTP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' . 
+          $errStr . '. Sleeping for ' . $httpRetry . ' seconds.');
         sleep($httpRetry);
         continue;
         
@@ -470,6 +473,9 @@ abstract class Phirehose
       
       // Loop until connected OK
     } while (!is_resource($this->conn) || $httpCode != 200);
+    
+    // Connected OK, reset connect failures
+    $connectFailures = 0;
     
     // Switch to non-blocking to consume the stream (important) 
     stream_set_blocking($this->conn, 0);
