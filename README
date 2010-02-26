@@ -1,5 +1,13 @@
 See: http://code.google.com/p/phirehose/
 
+0.2.3 (2010-02-26)
+------------------
+ - Implemented stream idle timeouts (reconnects if streams die)
+ - Implemented per-connection DNS lookups
+ - Fixed bug where you could get caught in reconnect loop if invalid filter predicates specified
+ - Added getLastErrorMsg() and getLastErrorNo() methods (to deal with above)
+ - Improved logging
+
 0.2.2 (2010-02-10)
 ------------------
  - Fixed @version tag
