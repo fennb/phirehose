@@ -7,7 +7,7 @@
  *  - http://apiwiki.twitter.com/Streaming-API-Documentation 
  * 
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
- * @version 0.2.3 ($Id$)
+ * @version 0.2.4 ($Id$)
  */
 abstract class Phirehose
 {
@@ -22,7 +22,7 @@ abstract class Phirehose
   const METHOD_SAMPLE    = 'sample';
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
-  const USER_AGENT       = 'Phirehose/0.2.3 +http://code.google.com/p/phirehose/';
+  const USER_AGENT       = 'Phirehose/0.2.4 +http://code.google.com/p/phirehose/';
   const FILTER_CHECK_MIN = 5;
   const FILTER_UPD_MIN   = 120;
   const TCP_BACKOFF      = 1;
@@ -44,6 +44,8 @@ abstract class Phirehose
   protected $trackWords;
   protected $locationBoxes;
   protected $conn;
+  protected $fdrPool;
+  protected $buff;
   // State vars
   protected $filterChanged;
   protected $reconnect;
@@ -87,8 +89,9 @@ abstract class Phirehose
    */
   public function setFollow($userIds)
   {
+    $userIds = ($userIds === NULL) ? array() : $userIds;
     sort($userIds); // Non-optimal but necessary 
-    if ($this->followIds != NULL && $this->followIds != $userIds) {
+    if ($this->followIds != $userIds) {
       $this->filterChanged = TRUE;
     }
     $this->followIds = $userIds;
@@ -115,8 +118,9 @@ abstract class Phirehose
    */
   public function setTrack($trackWords)
   {
+    $trackWords = ($trackWords === NULL) ? array() : $trackWords;
     sort($trackWords); // Non-optimal, but necessary
-    if ($this->trackWords != NULL && $this->trackWords != $trackWords) {
+    if ($this->trackWords != $trackWords) {
       $this->filterChanged = TRUE;
     }
     $this->trackWords = $trackWords;
@@ -155,6 +159,7 @@ abstract class Phirehose
    */
   public function setLocations($boundingBoxes)
   {
+    $boundingBoxes = ($boundingBoxes === NULL) ? array() : $boundingBoxes;
     sort($boundingBoxes); // Non-optimal, but necessary
     // Flatten to single dimensional array
     $locationBoxes = array();
@@ -169,7 +174,7 @@ abstract class Phirehose
       $locationBoxes = array_merge($locationBoxes, $boundingBox);
     }
     // If it's changed, make note
-    if ($this->locationBoxes != NULL && $this->locationBoxes != $locationBoxes) {
+    if ($this->locationBoxes != $locationBoxes) {
       $this->filterChanged = TRUE;
     }
     // Set flattened value
@@ -273,12 +278,10 @@ abstract class Phirehose
       // Init state
       $statusCount = $filterCheckCount = $enqueueSpent = $filterCheckSpent = $idlePeriod = $maxIdlePeriod = 0;
       $lastAverage = $lastFilterCheck = $lastFilterUpd = $lastStreamActivity = time();
-      $buff = '';
-      $fdr = array($this->conn);
-      $fdw = $fde = NULL;
+      $fdw = $fde = NULL; // Placeholder write/error file descriptors for stream_select
       
       // We use a blocking-select with timeout, to allow us to continue processing on idle streams
-      while ($this->conn !== NULL && !feof($this->conn) && ($numChanged = stream_select($fdr, $fdw, $fde, $this->readTimeout)) !== FALSE) {
+      while ($this->conn !== NULL && !feof($this->conn) && ($numChanged = stream_select($this->fdrPool, $fdw, $fde, $this->readTimeout)) !== FALSE) {
         /* Unfortunately, we need to do a safety check for dead twitter streams - This seems to be able to happen where
          * you end up with a valid connection, but NO tweets coming along the wire (or keep alives). The below guards
          * against this.
@@ -287,14 +290,13 @@ abstract class Phirehose
           $this->log('Idle timeout: No stream activity for > ' . $this->idleReconnectTimeout . ' seconds. ' . 
            ' Reconnecting.');
           $this->reconnect();
-          $fdr = array($this->conn); // Ugly, but required
           $lastStreamActivity = time();
           continue;
         }
         // Process stream/buffer
-        $fdr = array($this->conn); // Must reassign for stream_select()
-        $buff .= fread($this->conn, 6); // Small non-blocking to get delimiter text
-        if (($eol = strpos($buff, "\r\n")) === FALSE) {
+        $this->fdrPool = array($this->conn); // Must reassign for stream_select()
+        $this->buff .= fread($this->conn, 6); // Small non-blocking to get delimiter text
+        if (($eol = strpos($this->buff, "\r\n")) === FALSE) {
           continue; // We need a newline
         }
         // Track maximum idle period
@@ -303,21 +305,21 @@ abstract class Phirehose
         // We got a newline, this is stream activity
         $lastStreamActivity = time();
         // Read status length delimiter
-        $delimiter = substr($buff, 0, $eol);
-        $buff = substr($buff, $eol + 2); // consume off buffer, + 2 = "\r\n"
+        $delimiter = substr($this->buff, 0, $eol);
+        $this->buff = substr($this->buff, $eol + 2); // consume off buffer, + 2 = "\r\n"
         $statusLength = intval($delimiter);
         if ($statusLength > 0) {
           // Read status bytes and enqueue
-          $bytesLeft = $statusLength - strlen($buff);
-          while ($bytesLeft > 0 && $this->conn !== NULL && !feof($this->conn) && ($numChanged = stream_select($fdr, $fdw, $fde, 0, 20000)) !== FALSE) {
-            $fdr = array($this->conn); // Reassign
-            $buff .= fread($this->conn, $bytesLeft); // Read until all bytes are read into buffer
-            $bytesLeft = ($statusLength - strlen($buff));
+          $bytesLeft = $statusLength - strlen($this->buff);
+          while ($bytesLeft > 0 && $this->conn !== NULL && !feof($this->conn) && ($numChanged = stream_select($this->fdrPool, $fdw, $fde, 0, 20000)) !== FALSE) {
+            $this->fdrPool = array($this->conn); // Reassign
+            $this->buff .= fread($this->conn, $bytesLeft); // Read until all bytes are read into buffer
+            $bytesLeft = ($statusLength - strlen($this->buff));
           }
           // Accrue/enqueue and track time spent enqueing
           $statusCount ++;
           $enqueueStart = microtime(TRUE);
-          $this->enqueueStatus($buff);
+          $this->enqueueStatus($this->buff);
           $enqueueSpent += (microtime(TRUE) - $enqueueStart);
         } else {
           // Timeout/no data after readTimeout seconds
@@ -350,9 +352,8 @@ abstract class Phirehose
         }
         // Check if filter is ready + allowed to be updated (reconnect)
         if ($this->filterChanged == TRUE && (time() - $lastFilterUpd) >= self::FILTER_UPD_MIN) {
-          $this->log('Updating filter predicates (reconnecting).');
+          $this->log('Reconnecting due to changed filter predicates.');
           $this->reconnect();
-          $fdr = array($this->conn); // Ugly, but required
           $lastFilterUpd = time();
         }
         
@@ -560,6 +561,10 @@ abstract class Phirehose
     
     // Connect always causes the filterChanged status to be cleared
     $this->filterChanged = FALSE;
+    
+    // Flush stream buffer & (re)assign fdrPool (for reconnect)
+    $this->fdrPool = array($this->conn);
+    $this->buff = '';
     
   }
   

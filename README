@@ -1,5 +1,12 @@
 See: http://code.google.com/p/phirehose/
 
+0.2.4 (2010-04-07)
+------------------
+ - Fixed bug where filter predicates got "stuck" as blank/null (reported by Toby P)
+ - Fixed bug where hang could occur after reconnect to quiet streams (reported by Toby P)
+ - Cleaned up connect() state initialization to reliably reconnect
+
+
 0.2.3 (2010-02-26)
 ------------------
  - Implemented stream idle timeouts (reconnects if streams die)
