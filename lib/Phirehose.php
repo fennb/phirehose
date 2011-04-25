@@ -419,7 +419,6 @@ abstract class Phirehose
       // Construct URL/HTTP bits
       $url = self::URL_BASE . $this->method . '.' . $this->format;
       $urlParts = parse_url($url);
-      $authCredentials = base64_encode($this->username . ':' . $this->password);
       
       // Setup params appropriately
       $requestParams = array('delimited' => 'length');
@@ -448,6 +447,7 @@ abstract class Phirehose
        */
       $errNo = $errStr = NULL;
       $scheme = ($urlParts['scheme'] == 'https') ? 'ssl://' : 'tcp://';
+			$port = ($urlParts['scheme'] == 'https') ? 443 : 80;
       
       /**
        * We must perform manual host resolution here as Twitter's IP regularly rotates (ie: DNS TTL of 60 seconds) and 
@@ -455,6 +455,8 @@ abstract class Phirehose
        */
       $streamIPs = gethostbynamel($urlParts['host']);
       if (count($streamIPs) == 0) {
+			// TODO Is this better??
+			// if (empty($streamIPs)) {
         throw new ErrorException("Unable to resolve hostname: '" . $urlParts['host'] . '"');
       }
       
@@ -463,7 +465,7 @@ abstract class Phirehose
       $streamIP = $streamIPs[rand(0, (count($streamIPs) - 1))];
       $this->log('Connecting to ' . $streamIP);
       
-      @$this->conn = fsockopen($scheme . $streamIP, 80, $errNo, $errStr, $this->connectTimeout);
+      @$this->conn = fsockopen($scheme . $streamIP, $port, $errNo, $errStr, $this->connectTimeout);
   
       // No go - handle errors/backoff
       if (!$this->conn || !is_resource($this->conn)) {
@@ -493,18 +495,31 @@ abstract class Phirehose
   
       // Encode request data
       $postData = http_build_query($requestParams);
+
+			$authCredentials = $this->getAuthorizationHeader();
       
       // Do it
       fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.0\r\n");
-      fwrite($this->conn, "Host: " . $urlParts['host'] . "\r\n");
+      fwrite($this->conn, "Host: " . $urlParts['host'] . ':' . $port . "\r\n");
       fwrite($this->conn, "Content-type: application/x-www-form-urlencoded\r\n");
       fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
       fwrite($this->conn, "Accept: */*\r\n");
-      fwrite($this->conn, 'Authorization: Basic ' . $authCredentials . "\r\n");
+      fwrite($this->conn, 'Authorization: ' . $authCredentials . "\r\n");
       fwrite($this->conn, 'User-Agent: ' . self::USER_AGENT . "\r\n");
       fwrite($this->conn, "\r\n");
       fwrite($this->conn, $postData . "\r\n");
       fwrite($this->conn, "\r\n");
+      
+      $this->log("POST " . $urlParts['path'] . " HTTP/1.0\r\n");
+      $this->log("Host: " . $urlParts['host'] . ':' . $port . "\r\n");
+      $this->log("Content-type: application/x-www-form-urlencoded\r\n");
+      $this->log("Content-length: " . strlen($postData) . "\r\n");
+      $this->log("Accept: */*\r\n");
+      $this->log('Authorization: ' . $authCredentials . "\r\n");
+      $this->log('User-Agent: ' . self::USER_AGENT . "\r\n");
+      $this->log("\r\n");
+      $this->log($postData . "\r\n");
+      $this->log("\r\n");
       
       // First line is response
       list($httpVer, $httpCode, $httpMessage) = preg_split('/\s+/', trim(fgets($this->conn, 1024)), 3);
@@ -567,6 +582,12 @@ abstract class Phirehose
     $this->buff = '';
     
   }
+
+	protected function getAuthorizationHeader()
+	{
+    $authCredentials = base64_encode($this->username . ':' . $this->password);
+		return "Basic: ".$authCredentials;
+	}
   
   /**
    * Method called as frequently as practical (every 5+ seconds) that is responsible for checking if filter predicates
