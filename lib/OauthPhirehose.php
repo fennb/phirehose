@@ -5,20 +5,6 @@ abstract class OauthPhirehose extends Phirehose
 	const URL_BASE = 'http://stream.twitter.com/1/statuses/';
 
 	protected $auth_method;
-	protected $twitterAccount = null;
-
-	public function __construct($username, $password,
-		$method = Phirehose::METHOD_FILTER,
-		$format = self::FORMAT_JSON
-		)
-	{
-		parent::__construct($username, $password, $method, $format);
-	}
-
-	public function setTwitterAccount(App_Model_Source_Twitter $twitterAccount)
-	{
-		$this->twitterAccount = $twitterAccount;
-	}
 
 	protected function connect()
 	{
