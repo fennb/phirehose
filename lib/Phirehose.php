@@ -4,10 +4,10 @@
  *
  * Note: This is beta software - Please read the following carefully before using:
  *  - http://code.google.com/p/phirehose/wiki/Introduction
- *  - http://apiwiki.twitter.com/Streaming-API-Documentation
+ *  - http://dev.twitter.com/pages/streaming_api
  *
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
- * @version 0.2.4 ($Id$)
+ * @version 0.2.gitmaster
  */
 abstract class Phirehose
 {
@@ -22,7 +22,7 @@ abstract class Phirehose
   const METHOD_SAMPLE    = 'sample';
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
-  const USER_AGENT       = 'Phirehose/0.2.4 +http://code.google.com/p/phirehose/';
+  const USER_AGENT       = 'Phirehose/0.2.gitmaster +http://code.google.com/p/phirehose/';
   const FILTER_CHECK_MIN = 5;
   const FILTER_UPD_MIN   = 120;
   const TCP_BACKOFF      = 1;
