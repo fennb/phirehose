@@ -1,13 +1,13 @@
 <?php
 /**
  * A class that makes it easy to connect to and consume the Twitter stream via the Streaming API.
- * 
- * Note: This is beta software - Please read the following carefully before using: 
+ *
+ * Note: This is beta software - Please read the following carefully before using:
  *  - http://code.google.com/p/phirehose/wiki/Introduction
- *  - http://apiwiki.twitter.com/Streaming-API-Documentation 
- * 
+ *  - http://dev.twitter.com/pages/streaming_api
+ *
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
- * @version 0.2.4 ($Id$)
+ * @version 0.2.gitmaster
  */
 abstract class Phirehose
 {
@@ -22,7 +22,7 @@ abstract class Phirehose
   const METHOD_SAMPLE    = 'sample';
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
-  const USER_AGENT       = 'Phirehose/0.2.4 +http://code.google.com/p/phirehose/';
+  const USER_AGENT       = 'Phirehose/0.2.gitmaster +http://code.google.com/p/phirehose/';
   const FILTER_CHECK_MIN = 5;
   const FILTER_UPD_MIN   = 120;
   const TCP_BACKOFF      = 1;
@@ -53,19 +53,20 @@ abstract class Phirehose
   protected $lastErrorNo;
   protected $lastErrorMsg;
   // Config type vars - override in subclass if desired
-  protected $connectFailuresMax = 20; 
+  protected $connectFailuresMax = 20;
   protected $connectTimeout = 5;
   protected $readTimeout = 5;
   protected $idleReconnectTimeout = 90;
   protected $avgPeriod = 60;
-
+  protected $status_length_base = 10;
+  
   /**
-   * Create a new Phirehose object attached to the appropriate twitter stream method. 
+   * Create a new Phirehose object attached to the appropriate twitter stream method.
    * Methods are: METHOD_FIREHOSE, METHOD_RETWEET, METHOD_SAMPLE, METHOD_FILTER
    * Formats are: FORMAT_JSON, FORMAT_XML
    * @see Phirehose::METHOD_SAMPLE
    * @see Phirehose::FORMAT_JSON
-   * 
+   *
    * @param string $username Any twitter username
    * @param string $password Any twitter password
    * @param string $method
@@ -80,17 +81,17 @@ abstract class Phirehose
   }
   
   /**
-   * Returns public statuses from or in reply to a set of users. Mentions ("Hello @user!") and implicit replies 
+   * Returns public statuses from or in reply to a set of users. Mentions ("Hello @user!") and implicit replies
    * ("@user Hello!" created without pressing the reply button) are not matched. It is up to you to find the integer
    * IDs of each twitter user.
    * Applies to: METHOD_FILTER
-   * 
+   *
    * @param array $userIds Array of Twitter integer userIDs
    */
   public function setFollow($userIds)
   {
     $userIds = ($userIds === NULL) ? array() : $userIds;
-    sort($userIds); // Non-optimal but necessary 
+    sort($userIds); // Non-optimal but necessary
     if ($this->followIds != $userIds) {
       $this->filterChanged = TRUE;
     }
@@ -108,10 +109,10 @@ abstract class Phirehose
   }
   
   /**
-   * Specifies keywords to track. Track keywords are case-insensitive logical ORs. Terms are exact-matched, ignoring 
+   * Specifies keywords to track. Track keywords are case-insensitive logical ORs. Terms are exact-matched, ignoring
    * punctuation. Phrases, keywords with spaces, are not supported. Queries are subject to Track Limitations.
    * Applies to: METHOD_FILTER
-   * 
+   *
    * See: http://apiwiki.twitter.com/Streaming-API-Documentation#TrackLimiting
    *
    * @param array $trackWords
@@ -127,7 +128,7 @@ abstract class Phirehose
   }
   
   /**
-   * Returns an array of keywords being tracked 
+   * Returns an array of keywords being tracked
    *
    * @return array
    */
@@ -137,24 +138,24 @@ abstract class Phirehose
   }
   
   /**
-   * Specifies a set of bounding boxes to track as an array of 4 element lon/lat pairs denoting <south-west point>, 
+   * Specifies a set of bounding boxes to track as an array of 4 element lon/lat pairs denoting <south-west point>,
    * <north-east point>. Only tweets that are both created using the Geotagging API and are placed from within a tracked
    * bounding box will be included in the stream. The user's location field is not used to filter tweets. Bounding boxes
-   * are logical ORs and must be less than or equal to 1 degree per side. A locations parameter may be combined with 
+   * are logical ORs and must be less than or equal to 1 degree per side. A locations parameter may be combined with
    * track parameters, but note that all terms are logically ORd.
-   * 
+   *
    * NOTE: The argument order is Longitude/Latitude (to match the Twitter API and GeoJSON specifications).
-   * 
+   *
    * Applies to: METHOD_FILTER
-   * 
+   *
    * See: http://apiwiki.twitter.com/Streaming-API-Documentation#locations
    *
-   * Eg: 
+   * Eg:
    *  setLocations(array(
    *      array(-122.75, 36.8, -121.75, 37.8), // San Francisco
-   *      array(-74, 40, -73, 41),             // New York 
+   *      array(-74, 40, -73, 41),             // New York
    *  ));
-   * 
+   *
    * @param array $boundingBoxes
    */
   public function setLocations($boundingBoxes)
@@ -182,7 +183,7 @@ abstract class Phirehose
   }
   
   /**
-   * Returns an array of 4 element arrays that denote the monitored location bounding boxes for tweets using the 
+   * Returns an array of 4 element arrays that denote the monitored location bounding boxes for tweets using the
    * Geotagging API.
    *
    * @see setLocations()
@@ -201,19 +202,19 @@ abstract class Phirehose
   }
   
   /**
-   * Convenience method that sets location bounding boxes by an array of lon/lat/radius sets, rather than manually 
+   * Convenience method that sets location bounding boxes by an array of lon/lat/radius sets, rather than manually
    * specified bounding boxes. Each array element should contain 3 element subarray containing a latitude, longitude and
    * radius. Radius is specified in kilometers and is approximate (as boxes are square).
    *
    * NOTE: The argument order is Longitude/Latitude (to match the Twitter API and GeoJSON specifications).
-   * 
-   * Eg: 
+   *
+   * Eg:
    *  setLocationsByCircle(array(
    *      array(144.9631, -37.8142, 30), // Melbourne, 3km radius
-   *      array(-0.1262, 51.5001, 25),   // London 10km radius 
+   *      array(-0.1262, 51.5001, 25),   // London 10km radius
    *  ));
-   * 
-   *  
+   *
+   *
    * @see setLocations()
    * @param array
    */
@@ -237,8 +238,8 @@ abstract class Phirehose
       // Add to bounding box array
       $boundingBoxes[] = array($minLon, $minLat, $maxLon, $maxLat);
       // Debugging is handy
-      $this->log('Resolved location circle [' . $lon . ', ' . $lat . ', r: ' . $radius . '] -> bbox: [' . $minLon . 
-        ', ' . $minLat . ', ' . $maxLon . ', ' . $maxLat . ']');          
+      $this->log('Resolved location circle [' . $lon . ', ' . $lat . ', r: ' . $radius . '] -> bbox: [' . $minLon .
+        ', ' . $minLat . ', ' . $maxLon . ', ' . $maxLat . ']');
     }
     // Set by bounding boxes
     $this->setLocations($boundingBoxes);
@@ -248,20 +249,20 @@ abstract class Phirehose
    * Sets the number of previous statuses to stream before transitioning to the live stream. Applies only to firehose
    * and filter + track methods. This is generally used internally and should not be needed by client applications.
    * Applies to: METHOD_FILTER, METHOD_FIREHOSE
-   * 
+   *
    * @param integer $count
    */
   public function setCount($count)
   {
-    $this->count = $count;  
+    $this->count = $count;
   }
   
   /**
    * Connects to the stream API and consumes the stream. Each status update in the stream will cause a call to the
    * handleStatus() method.
-   * 
+   *
    * @see handleStatus()
-   * @param boolean $reconnect Reconnects as per recommended   
+   * @param boolean $reconnect Reconnects as per recommended
    * @throws ErrorException
    */
   public function consume($reconnect = TRUE)
@@ -287,7 +288,7 @@ abstract class Phirehose
          * against this.
          */
         if ((time() - $lastStreamActivity) > $this->idleReconnectTimeout) {
-          $this->log('Idle timeout: No stream activity for > ' . $this->idleReconnectTimeout . ' seconds. ' . 
+          $this->log('Idle timeout: No stream activity for > ' . $this->idleReconnectTimeout . ' seconds. ' .
            ' Reconnecting.');
           $this->reconnect();
           $lastStreamActivity = time();
@@ -307,7 +308,7 @@ abstract class Phirehose
         // Read status length delimiter
         $delimiter = substr($this->buff, 0, $eol);
         $this->buff = substr($this->buff, $eol + 2); // consume off buffer, + 2 = "\r\n"
-        $statusLength = intval($delimiter);
+        $statusLength = intval($delimiter, $this->status_length_base);
         if ($statusLength > 0) {
           // Read status bytes and enqueue
           $bytesLeft = $statusLength - strlen($this->buff);
@@ -317,15 +318,16 @@ abstract class Phirehose
             $bytesLeft = ($statusLength - strlen($this->buff));
           }
           // Accrue/enqueue and track time spent enqueing
-          $statusCount ++;
           $enqueueStart = microtime(TRUE);
-          $this->enqueueStatus($this->buff);
-          $enqueueSpent += (microtime(TRUE) - $enqueueStart);
+          if($this->enqueueStatus($this->buff)) {
+          	$statusCount++;
+          	$enqueueSpent += (microtime(TRUE) - $enqueueStart);
+          }
         } else {
           // Timeout/no data after readTimeout seconds
           
         }
-        // Calc counter averages 
+        // Calc counter averages
         $avgElapsed = time() - $lastAverage;
         if ($avgElapsed >= $this->avgPeriod) {
           // Calc tweets-per-second
@@ -334,12 +336,16 @@ abstract class Phirehose
           $enqueueTimeMS = ($statusCount > 0) ? round($enqueueSpent / $statusCount * 1000, 2) : 0;
           // Calc time spent total in filter predicate checking
           $filterCheckTimeMS = ($filterCheckCount > 0) ? round($filterCheckSpent / $filterCheckCount * 1000, 2) : 0;
-          $this->log('Consume rate: ' . $this->statusRate . ' status/sec (' . $statusCount . ' total), avg ' . 
-            'enqueueStatus(): ' . $enqueueTimeMS . 'ms, avg checkFilterPredicates(): ' . $filterCheckTimeMS . 'ms (' . 
-            $filterCheckCount . ' total) over ' . $this->avgPeriod . ' seconds, max stream idle period: ' . 
+          $this->log('Consume rate: ' . $this->statusRate . ' status/sec (' . $statusCount . ' total), avg ' .
+            'enqueueStatus(): ' . $enqueueTimeMS . 'ms, avg checkFilterPredicates(): ' . $filterCheckTimeMS . 'ms (' .
+            $filterCheckCount . ' total) over ' . $this->avgPeriod . ' seconds, max stream idle period: ' .
               $maxIdlePeriod . ' seconds.');
+          $elapsed = $avgElapsed;
+          $statusRate = $this->statusRate;
+          $enqueueSpentAvg = $enqueueTimeMS;
+          $this->heartbeat(compact('elapsed', 'statusRate', 'statusCount', 'enqueueSpent', 'enqueueSpentAvg', 'filterCheckCount', 'filterCheckSpent', 'idlePeriod', 'maxIdlePeriod'));
           // Reset
-          $statusCount = $filterCheckCount = $enqueueSpent = $filterCheckSpent = $idlePeriod = $maxIdlePeriod = 0;
+          $elapsed = $statusRate = $statusCount = $filterCheckCount = $enqueueSpent = $enqueueSpentAvg = $filterCheckSpent = $idlePeriod = $maxIdlePeriod = 0;
           $lastAverage = time();
         }
         // Check if we're ready to check filter predicates
@@ -364,7 +370,7 @@ abstract class Phirehose
       $this->lastErrorMsg = ($this->lastErrorNo > 0) ? @socket_strerror($this->lastErrorNo) : 'Socket disconnected';
       $this->log('Phirehose connection error occured: ' . $this->lastErrorMsg);
       
-      // Reconnect 
+      // Reconnect
     } while ($this->reconnect);
 
     // Exit
@@ -383,11 +389,11 @@ abstract class Phirehose
   }
   
   /**
-   * Returns the last error number that occured with the streaming API or client. Numbers correspond to either the 
+   * Returns the last error number that occured with the streaming API or client. Numbers correspond to either the
    * fsockopen() error states (in the case of TCP errors) or HTTP error codes from Twitter (in the case of HTTP errors).
-   * 
+   *
    * State is cleared upon successful reconnect.
-   * 
+   *
    * @return string
    */
   public function getLastErrorNo()
@@ -400,7 +406,7 @@ abstract class Phirehose
    * Connects to the stream URL using the configured method.
    * @throws ErrorException
    */
-  protected function connect() 
+  protected function connect()
   {
 
     // Init state
@@ -428,36 +434,34 @@ abstract class Phirehose
         $requestParams['track'] = implode(',', $this->trackWords);
       }
       if ($this->method == self::METHOD_FILTER && count($this->followIds) > 0) {
-        $requestParams['follow'] = implode(',', $this->followIds); 
+        $requestParams['follow'] = implode(',', $this->followIds);
       }
       if ($this->method == self::METHOD_FILTER && count($this->locationBoxes) > 0) {
-        $requestParams['locations'] = implode(',', $this->locationBoxes); 
+        $requestParams['locations'] = implode(',', $this->locationBoxes);
       }
-      if ($this->count > 0) {
-        $requestParams['count'] = $this->count;    
+      if ($this->count <> 0) {
+        $requestParams['count'] = $this->count;
       }
   
       // Debugging is useful
-      $this->log('Connecting to twitter stream: ' . $url . ' with params: ' . str_replace("\n", '', 
+      $this->log('Connecting to twitter stream: ' . $url . ' with params: ' . str_replace("\n", '',
         var_export($requestParams, TRUE)));
       
       /**
-       * Open socket connection to make POST request. It'd be nice to use stream_context_create with the native 
+       * Open socket connection to make POST request. It'd be nice to use stream_context_create with the native
        * HTTP transport but it hides/abstracts too many required bits (like HTTP error responses).
        */
       $errNo = $errStr = NULL;
       $scheme = ($urlParts['scheme'] == 'https') ? 'ssl://' : 'tcp://';
-			$port = ($urlParts['scheme'] == 'https') ? 443 : 80;
+      $port = ($urlParts['scheme'] == 'https') ? 443 : 80;
       
       /**
-       * We must perform manual host resolution here as Twitter's IP regularly rotates (ie: DNS TTL of 60 seconds) and 
+       * We must perform manual host resolution here as Twitter's IP regularly rotates (ie: DNS TTL of 60 seconds) and
        * PHP appears to cache it the result if in a long running process (as per Phirehose).
        */
       $streamIPs = gethostbynamel($urlParts['host']);
-      if (count($streamIPs) == 0) {
-			// TODO Is this better??
-			// if (empty($streamIPs)) {
-        throw new ErrorException("Unable to resolve hostname: '" . $urlParts['host'] . '"');
+      if(empty($streamIPs)) {
+        throw new PhirehoseNetworkException("Unable to resolve hostname: '" . $urlParts['host'] . '"');
       }
       
       // Choose one randomly (if more than one)
@@ -475,7 +479,7 @@ abstract class Phirehose
         if ($connectFailures > $this->connectFailuresMax) {
           $msg = 'TCP failure limit exceeded with ' . $connectFailures . ' failures. Last error: ' . $errStr;
           $this->log($msg);
-          throw new ErrorException($msg, $errNo); // Throw an exception for other code to handle
+          throw new PhirehoseConnectLimitExceeded($msg, $errNo); // Throw an exception for other code to handle
         }
         // Increase retry/backoff up to max
         $tcpRetry = ($tcpRetry < self::TCP_BACKOFF_MAX) ? $tcpRetry * 2 : self::TCP_BACKOFF_MAX;
@@ -494,9 +498,8 @@ abstract class Phirehose
       stream_set_blocking($this->conn, 1);
   
       // Encode request data
-      $postData = http_build_query($requestParams);
-
-			$authCredentials = $this->getAuthorizationHeader();
+      $postData = http_build_query($requestParams, NULL, '&');
+      $authCredentials = $this->getAuthorizationHeader();
       
       // Do it
       fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.0\r\n");
@@ -542,7 +545,7 @@ abstract class Phirehose
         }
         
         // Construct error
-        $errStr = 'HTTP ERROR ' . $httpCode . ': ' . $httpMessage . ' (' . $respBody . ')'; 
+        $errStr = 'HTTP ERROR ' . $httpCode . ': ' . $httpMessage . ' (' . $respBody . ')';
         
         // Set last error state
         $this->lastErrorMsg = $errStr;
@@ -552,11 +555,11 @@ abstract class Phirehose
         if ($connectFailures > $this->connectFailuresMax) {
           $msg = 'Connection failure limit exceeded with ' . $connectFailures . ' failures. Last error: ' . $errStr;
           $this->log($msg);
-          throw new ErrorException($msg); // We eventually throw an exception for other code to handle          
+          throw new PhirehoseConnectLimitExceeded($msg, $httpCode); // We eventually throw an exception for other code to handle
         }
         // Increase retry/backoff up to max
         $httpRetry = ($httpRetry < self::HTTP_BACKOFF_MAX) ? $httpRetry * 2 : self::HTTP_BACKOFF_MAX;
-        $this->log('HTTP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' . 
+        $this->log('HTTP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' .
           $errStr . '. Sleeping for ' . $httpRetry . ' seconds.');
         sleep($httpRetry);
         continue;
@@ -571,7 +574,7 @@ abstract class Phirehose
     $this->lastErrorMsg = NULL;
     $this->lastErrorNo = NULL;
     
-    // Switch to non-blocking to consume the stream (important) 
+    // Switch to non-blocking to consume the stream (important)
     stream_set_blocking($this->conn, 0);
     
     // Connect always causes the filterChanged status to be cleared
@@ -585,21 +588,21 @@ abstract class Phirehose
 
 	protected function getAuthorizationHeader()
 	{
-    $authCredentials = base64_encode($this->username . ':' . $this->password);
+		$authCredentials = base64_encode($this->username . ':' . $this->password);
 		return "Basic: ".$authCredentials;
 	}
   
   /**
    * Method called as frequently as practical (every 5+ seconds) that is responsible for checking if filter predicates
    * (ie: track words or follow IDs) have changed. If they have, they should be set using the setTrack() and setFollow()
-   * methods respectively within the overridden implementation. 
-   * 
+   * methods respectively within the overridden implementation.
+   *
    * Note that even if predicates are changed every 5 seconds, an actual reconnect will not happen more frequently than
    * every 2 minutes (as per Twitter Streaming API documentation).
-   * 
-   * Note also that this method is called upon every connect attempt, so if your predicates are causing connection 
+   *
+   * Note also that this method is called upon every connect attempt, so if your predicates are causing connection
    * errors, they should be checked here and corrected.
-   * 
+   *
    * This should be implemented/overridden in any subclass implementing the FILTER method.
    *
    * @see setTrack()
@@ -645,15 +648,27 @@ abstract class Phirehose
     $reconnect = $this->reconnect;
     $this->disconnect(); // Implicitly sets reconnect to FALSE
     $this->reconnect = $reconnect; // Restore state to prev
-    $this->connect(); 
+    $this->connect();
   }
   
   /**
    * This is the one and only method that must be implemented additionally. As per the streaming API documentation,
-   * statuses should NOT be processed within the same process that is performing collection 
+   * statuses should NOT be processed within the same process that is performing collection
    *
    * @param string $status
    */
   abstract public function enqueueStatus($status);
+
+  /**
+   * Reports a periodic heartbeat. Keep execution time minimal.
+   *
+   * @param array $data
+   * @return NULL
+   */
+  public function heartbeat(array $data) {}
   
 } // End of class
+
+class PhirehoseException extends Exception {}
+class PhirehoseNetworkException extends PhirehoseException {}
+class PhirehoseConnectLimitExceeded extends PhirehoseException {}

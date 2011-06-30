@@ -88,7 +88,7 @@ class GhettoQueueConsumer
     
     // Loop over each line (1 line per status)
     $statusCounter = 0;
-    while ($rawStatus = fgets($fp, 4096)) {
+    while ($rawStatus = fgets($fp, 8192)) {
       $statusCounter ++;
       
       /** **************** NOTE ********************
