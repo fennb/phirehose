@@ -5,7 +5,6 @@
  * Note: This is beta software - Please read the following carefully before using:
  *  - http://code.google.com/p/phirehose/wiki/Introduction
  *  - http://dev.twitter.com/pages/streaming_api
- *
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
  * @version 0.2.gitmaster
  */
@@ -22,13 +21,6 @@ abstract class Phirehose
   const METHOD_SAMPLE    = 'sample';
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
-  const USER_AGENT       = 'Phirehose/0.2.gitmaster +http://code.google.com/p/phirehose/';
-  const FILTER_CHECK_MIN = 5;
-  const FILTER_UPD_MIN   = 120;
-  const TCP_BACKOFF      = 1;
-  const TCP_BACKOFF_MAX  = 16;
-  const HTTP_BACKOFF     = 10;
-  const HTTP_BACKOFF_MAX = 240;
   const EARTH_RADIUS_KM  = 6371;
   
   
@@ -39,7 +31,7 @@ abstract class Phirehose
   protected $password;
   protected $method;
   protected $format;
-  protected $count;
+  protected $count; //Can be -150,000 to 150,000. @see http://dev.twitter.com/pages/streaming_api_methods#count
   protected $followIds;
   protected $trackWords;
   protected $locationBoxes;
@@ -59,6 +51,13 @@ abstract class Phirehose
   protected $idleReconnectTimeout = 90;
   protected $avgPeriod = 60;
   protected $status_length_base = 10;
+  protected $userAgent       = 'Phirehose/0.2.4 +http://code.google.com/p/phirehose/';
+  protected $filterCheckMin = 5;
+  protected $filterUpdMin   = 120;
+  protected $tcpBackoff      = 1;
+  protected $tcpBackoffMax  = 16;
+  protected $httpBackoff  = 10;
+  protected $httpBackoffMax  = 240;
   
   /**
    * Create a new Phirehose object attached to the appropriate twitter stream method.
@@ -168,7 +167,7 @@ abstract class Phirehose
       // Sanity check
       if (count($boundingBox) != 4) {
         // Invalid - Not much we can do here but log error
-        $this->log('Invalid location bounding box: [' . implode(', ', $boundingBox) . ']');
+        $this->log('Invalid location bounding box: [' . implode(', ', $boundingBox) . ']','error');
         return FALSE;
       }
       // Append this lat/lon pairs to flattened array
@@ -224,7 +223,7 @@ abstract class Phirehose
       // Sanity check
       if (count($locTriplet) != 3) {
         // Invalid - Not much we can do here but log error
-        $this->log('Invalid location triplet for ' . __METHOD__ . ': [' . implode(', ', $locTriplet) . ']');
+        $this->log('Invalid location triplet for ' . __METHOD__ . ': [' . implode(', ', $locTriplet) . ']','error');
         return FALSE;
       }
       list($lon, $lat, $radius) = $locTriplet;
@@ -288,8 +287,8 @@ abstract class Phirehose
          * against this.
          */
         if ((time() - $lastStreamActivity) > $this->idleReconnectTimeout) {
-          $this->log('Idle timeout: No stream activity for > ' . $this->idleReconnectTimeout . ' seconds. ' .
-           ' Reconnecting.');
+          $this->log('Idle timeout: No stream activity for > ' . $this->idleReconnectTimeout . ' seconds. ' . 
+           ' Reconnecting.','info');
           $this->reconnect();
           $lastStreamActivity = time();
           continue;
@@ -320,8 +319,10 @@ abstract class Phirehose
           // Accrue/enqueue and track time spent enqueing
           $enqueueStart = microtime(TRUE);
           if($this->enqueueStatus($this->buff)) {
-          	$statusCount++;
-          	$enqueueSpent += (microtime(TRUE) - $enqueueStart);
+          $statusCount ++;
+          $enqueueStart = microtime(TRUE);
+          $this->enqueueStatus($this->buff);
+          $enqueueSpent += (microtime(TRUE) - $enqueueStart);
           }
         } else {
           // Timeout/no data after readTimeout seconds
@@ -330,26 +331,16 @@ abstract class Phirehose
         // Calc counter averages
         $avgElapsed = time() - $lastAverage;
         if ($avgElapsed >= $this->avgPeriod) {
-          // Calc tweets-per-second
-          $this->statusRate = round($statusCount / $avgElapsed, 0);
-          // Calc time spent per enqueue in ms
-          $enqueueTimeMS = ($statusCount > 0) ? round($enqueueSpent / $statusCount * 1000, 2) : 0;
-          // Calc time spent total in filter predicate checking
-          $filterCheckTimeMS = ($filterCheckCount > 0) ? round($filterCheckSpent / $filterCheckCount * 1000, 2) : 0;
-          $this->log('Consume rate: ' . $this->statusRate . ' status/sec (' . $statusCount . ' total), avg ' .
-            'enqueueStatus(): ' . $enqueueTimeMS . 'ms, avg checkFilterPredicates(): ' . $filterCheckTimeMS . 'ms (' .
-            $filterCheckCount . ' total) over ' . $this->avgPeriod . ' seconds, max stream idle period: ' .
-              $maxIdlePeriod . ' seconds.');
+          $this->statusRate = round($statusCount / $avgElapsed, 0);          // Calc tweets-per-second
           $elapsed = $avgElapsed;
           $statusRate = $this->statusRate;
           $enqueueSpentAvg = $enqueueTimeMS;
           $this->heartbeat(compact('elapsed', 'statusRate', 'statusCount', 'enqueueSpent', 'enqueueSpentAvg', 'filterCheckCount', 'filterCheckSpent', 'idlePeriod', 'maxIdlePeriod'));
-          // Reset
-          $elapsed = $statusRate = $statusCount = $filterCheckCount = $enqueueSpent = $enqueueSpentAvg = $filterCheckSpent = $idlePeriod = $maxIdlePeriod = 0;
+          $this->statusUpdate($lastAverage, $statusCount, $filterCheckCount, $enqueueSpent, $filterCheckSpent, $idlePeriod, $maxIdlePeriod);
           $lastAverage = time();
         }
         // Check if we're ready to check filter predicates
-        if ($this->method == self::METHOD_FILTER && (time() - $lastFilterCheck) >= self::FILTER_CHECK_MIN) {
+        if ($this->method == self::METHOD_FILTER && (time() - $lastFilterCheck) >= $this->filterCheckMin) {
           $filterCheckCount ++;
           $lastFilterCheck = time();
           $filterCheckStart = microtime(TRUE);
@@ -357,8 +348,8 @@ abstract class Phirehose
           $filterCheckSpent +=  (microtime(TRUE) - $filterCheckStart);
         }
         // Check if filter is ready + allowed to be updated (reconnect)
-        if ($this->filterChanged == TRUE && (time() - $lastFilterUpd) >= self::FILTER_UPD_MIN) {
-          $this->log('Reconnecting due to changed filter predicates.');
+        if ($this->filterChanged == TRUE && (time() - $lastFilterUpd) >= $this->filterUpdMin) {
+          $this->log('Reconnecting due to changed filter predicates.','info');
           $this->reconnect();
           $lastFilterUpd = time();
         }
@@ -368,7 +359,7 @@ abstract class Phirehose
       // Some sort of socket error has occured
       $this->lastErrorNo = is_resource($this->conn) ? @socket_last_error($this->conn) : NULL;
       $this->lastErrorMsg = ($this->lastErrorNo > 0) ? @socket_strerror($this->lastErrorNo) : 'Socket disconnected';
-      $this->log('Phirehose connection error occured: ' . $this->lastErrorMsg);
+      $this->log('Phirehose connection error occured: ' . $this->lastErrorMsg,'error');
       
       // Reconnect
     } while ($this->reconnect);
@@ -376,6 +367,47 @@ abstract class Phirehose
     // Exit
     $this->log('Exiting.');
     
+  }
+
+
+
+  /**
+   * Called every $this->avgPeriod (default=60) seconds, and this default implementation
+   * calculates some rates, logs them, and resets the counters.
+   *
+   * All parameters, except $avgElapsed, they are passed by reference.
+   * For all these reference parameters, it is the total since either the start of the application
+   * (if you don't reset them here), or since the last call to this function (if you reset them here).
+   *
+   * Another input you may want to use is $this->statusRate, which is calculated
+   * freshly before this function is called, and is simply $statusCount divided by $avgElapsed.
+   *
+   * @param Integer $avgElapsed The number of seconds since the previous call to this function.
+   *       (Or, if this is the first call, then the number of seconds since the application started up.)
+   * @param Integer $statusCount The number of tweets received (i.e. the number of calls
+   *       to $this->enqueueStatus().
+   * @param Integer $filterCheckCount The number of calls to $this->checkFilterPredicates(). (By
+   *       default this function is called every 5 seconds, so this will typically be 12.)
+   * @param Float $enqueueSpent Total number of seconds (fractional) spent in the enqueueStatus() calls.
+   * @param Float $filterCheckSpent Total number of seconds (fractional) spent in the checkFilterPredicates() calls.
+   * @param Integer $idlePeriod Number of seconds since the last tweet arrived (or the keep-alive newline)
+   * @param Integer $maxIdlePeriod The maximum value $idlePeriod has reached.
+   *
+   * @todo Replace usage of $this->avgPeriod with $avgElapsed
+   */
+  protected function statusUpdate($avgElapsed, &$statusCount, &$filterCheckCount,
+    &$enqueueSpent, &$filterCheckSpent, &$idlePeriod, &$maxIdlePeriod)
+  {
+      // Calc time spent per enqueue in ms
+      $enqueueTimeMS = ($statusCount > 0) ? round($enqueueSpent / $statusCount * 1000, 2) : 0;
+      // Calc time spent total in filter predicate checking
+      $filterCheckTimeMS = ($filterCheckCount > 0) ? round($filterCheckSpent / $filterCheckCount * 1000, 2) : 0;
+      $this->log('Consume rate: ' . $this->statusRate . ' status/sec (' . $statusCount . ' total), avg ' . 
+        'enqueueStatus(): ' . $enqueueTimeMS . 'ms, avg checkFilterPredicates(): ' . $filterCheckTimeMS . 'ms (' . 
+        $filterCheckCount . ' total) over ' . $this->avgPeriod . ' seconds, max stream idle period: ' . 
+          $maxIdlePeriod . ' seconds.');
+      // Reset
+      $statusCount = $filterCheckCount = $enqueueSpent = $filterCheckSpent = $idlePeriod = $maxIdlePeriod = 0;
   }
   
   /**
@@ -411,8 +443,8 @@ abstract class Phirehose
 
     // Init state
     $connectFailures = 0;
-    $tcpRetry = self::TCP_BACKOFF / 2;
-    $httpRetry = self::HTTP_BACKOFF / 2;
+    $tcpRetry = $this->tcpBackoff / 2;
+    $httpRetry = $this->httpBackoff / 2;
 
     // Keep trying until connected (or max connect failures exceeded)
     do {
@@ -440,7 +472,7 @@ abstract class Phirehose
         $requestParams['locations'] = implode(',', $this->locationBoxes);
       }
       if ($this->count <> 0) {
-        $requestParams['count'] = $this->count;
+        $requestParams['count'] = $this->count;    
       }
   
       // Debugging is useful
@@ -478,13 +510,13 @@ abstract class Phirehose
         $connectFailures ++;
         if ($connectFailures > $this->connectFailuresMax) {
           $msg = 'TCP failure limit exceeded with ' . $connectFailures . ' failures. Last error: ' . $errStr;
-          $this->log($msg);
+          $this->log($msg,'error');
           throw new PhirehoseConnectLimitExceeded($msg, $errNo); // Throw an exception for other code to handle
         }
         // Increase retry/backoff up to max
-        $tcpRetry = ($tcpRetry < self::TCP_BACKOFF_MAX) ? $tcpRetry * 2 : self::TCP_BACKOFF_MAX;
+        $tcpRetry = ($tcpRetry < $this->tcpBackoffMax) ? $tcpRetry * 2 : $this->tcpBackoffMax;
         $this->log('TCP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' .
-          $errStr . ' (' . $errNo . '). Sleeping for ' . $tcpRetry . ' seconds.');
+          $errStr . ' (' . $errNo . '). Sleeping for ' . $tcpRetry . ' seconds.','info');
         sleep($tcpRetry);
         continue;
       }
@@ -499,6 +531,9 @@ abstract class Phirehose
   
       // Encode request data
       $postData = http_build_query($requestParams, NULL, '&');
+      $postData = str_replace('+','%20',$postData); //Change it from RFC1738 to RFC3986 (see
+            //enc_type parameter in http://php.net/http_build_query and note that enc_type is
+            //not available as of php 5.3)
       $authCredentials = $this->getAuthorizationHeader();
       
       // Do it
@@ -508,7 +543,7 @@ abstract class Phirehose
       fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
       fwrite($this->conn, "Accept: */*\r\n");
       fwrite($this->conn, 'Authorization: ' . $authCredentials . "\r\n");
-      fwrite($this->conn, 'User-Agent: ' . self::USER_AGENT . "\r\n");
+      fwrite($this->conn, 'User-Agent: ' . $this->userAgent . "\r\n");
       fwrite($this->conn, "\r\n");
       fwrite($this->conn, $postData . "\r\n");
       fwrite($this->conn, "\r\n");
@@ -519,7 +554,7 @@ abstract class Phirehose
       $this->log("Content-length: " . strlen($postData) . "\r\n");
       $this->log("Accept: */*\r\n");
       $this->log('Authorization: ' . $authCredentials . "\r\n");
-      $this->log('User-Agent: ' . self::USER_AGENT . "\r\n");
+      $this->log('User-Agent: ' . $this->userAgent . "\r\n");
       $this->log("\r\n");
       $this->log($postData . "\r\n");
       $this->log("\r\n");
@@ -554,13 +589,13 @@ abstract class Phirehose
         // Have we exceeded maximum failures?
         if ($connectFailures > $this->connectFailuresMax) {
           $msg = 'Connection failure limit exceeded with ' . $connectFailures . ' failures. Last error: ' . $errStr;
-          $this->log($msg);
-          throw new PhirehoseConnectLimitExceeded($msg, $httpCode); // We eventually throw an exception for other code to handle
+          $this->log($msg,'error');
+          throw new PhirehoseConnectLimitExceeded($msg, $httpCode); // We eventually throw an exception for other code to handle          
         }
         // Increase retry/backoff up to max
-        $httpRetry = ($httpRetry < self::HTTP_BACKOFF_MAX) ? $httpRetry * 2 : self::HTTP_BACKOFF_MAX;
-        $this->log('HTTP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' .
-          $errStr . '. Sleeping for ' . $httpRetry . ' seconds.');
+        $httpRetry = ($httpRetry < $this->httpBackoffMax) ? $httpRetry * 2 : $this->httpBackoffMax;
+        $this->log('HTTP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' . 
+          $errStr . '. Sleeping for ' . $httpRetry . ' seconds.','info');
         sleep($httpRetry);
         continue;
         
@@ -620,8 +655,13 @@ abstract class Phirehose
    *
    * @see error_log()
    * @param string $messages
+   * @param String $level 'error', 'info', 'notice'. Defaults to 'notice', so you should set this
+   *     parameter on the more important error messages.
+   *     'info' is used for problems that the class should be able to recover from automatically.
+   *     'error' is for exceptional conditions that may need human intervention. (For instance, emailing
+   *          them to a system administrator may make sense.)
    */
-  protected function log($message)
+  protected function log($message,$level='notice')
   {
     @error_log('Phirehose: ' . $message, 0);
   }
@@ -666,7 +706,7 @@ abstract class Phirehose
    * @return NULL
    */
   public function heartbeat(array $data) {}
-  
+
 } // End of class
 
 class PhirehoseException extends Exception {}
