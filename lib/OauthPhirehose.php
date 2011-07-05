@@ -6,13 +6,28 @@ abstract class OauthPhirehose extends Phirehose
 
 	protected $auth_method;
 
+    /**
+    * The Twitter consumer key. Get it from the application's page on Twitter.
+    * If not set then the global define TWITTER_CONSUMER_KEY is used instead.
+    */
+    public $consumerKey=null;
+
+    /**
+    * The Twitter consumer secret. Get it from the application's page on Twitter.
+    * If not set then the global define TWITTER_CONSUMER_SECRET is used instead.
+    */
+    public $consumerSecret=null;
+
+
+    /**
+    */
 	protected function prepareParameters($method = null, $url = null,
 		array $params)
 	{
 		if (empty($method) || empty($url))
 			return false;
 
-		$oauth['oauth_consumer_key'] = TWITTER_CONSUMER_KEY;
+		$oauth['oauth_consumer_key'] = $this->consumerKey?$this->consumerKey:TWITTER_CONSUMER_KEY;
 		$oauth['oauth_nonce'] = md5(uniqid(rand(), true));
 		$oauth['oauth_signature_method'] = 'HMAC-SHA1';
 		$oauth['oauth_timestamp'] = time();
@@ -100,7 +115,7 @@ abstract class OauthPhirehose extends Phirehose
 		$signatureBaseString = "{$method}&{$normalizedUrl}&{$concatenatedParams}";
 
 		# sign the signature string
-		$key = $this->encode_rfc3986(TWITTER_CONSUMER_SECRET) . '&' . $this->encode_rfc3986($this->password);
+		$key = $this->encode_rfc3986($this->consumerSecret?$this->consumerSecret:TWITTER_CONSUMER_SECRET) . '&' . $this->encode_rfc3986($this->password);
 		return base64_encode(hash_hmac('sha1', $signatureBaseString, $key, true));
 	}
 
