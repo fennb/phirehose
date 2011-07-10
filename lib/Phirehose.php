@@ -41,9 +41,88 @@ abstract class Phirehose
   // State vars
   protected $filterChanged;
   protected $reconnect;
+
+  /**
+  * The number of tweets received per second in previous minute; calculated fresh
+  * just before each call to statusUpdate()
+  * I.e. if fewer than 30 tweets in last minute then this will be zero; if 30 to 90 then it
+  * will be 1, if 90 to 150 then 2, etc.
+  *
+  * @var integer
+  */
   protected $statusRate;
+
   protected $lastErrorNo;
   protected $lastErrorMsg;
+
+  /**
+  * Number of tweets received.
+  *
+  * Note: by default this is the sum for last 60 seconds, and is therefore
+  * reset every 60 seconds.
+  * To change this behaviour write a custom statusUpdate() function.
+  *
+  * @var integer
+  */
+  protected $statusCount=0;
+
+  /**
+  * The number of calls to $this->checkFilterPredicates().
+  *
+  * By default it is called every 5 seconds, so if doing statusUpdates every
+  * 60 seconds and then resetting it, this will usually be 12.
+  *
+  * @var integer
+  */
+  protected $filterCheckCount=0;
+
+  /**
+  * Total number of seconds (fractional) spent in the enqueueStatus() calls (i.e. the customized
+  * function that handles each received tweet).
+  *
+  * @var float
+  */
+  protected $enqueueSpent=0;
+
+  /**
+  * Total number of seconds (fractional) spent in the checkFilterPredicates() calls
+  *
+  * @var float
+  */
+  protected $filterCheckSpent=0;
+
+  /**
+  * Number of seconds since the last tweet arrived (or the keep-alive newline)
+  *
+  * @var integer
+  */
+  protected $idlePeriod=0;
+
+  /**
+  * The maximum value $this->idlePeriod has reached.
+  *
+  * @var integer
+  */
+  protected $maxIdlePeriod=0;
+
+  /**
+  * Time spent on each call to enqueueStatus() (i.e. average time spent, in milliseconds,
+  * spent processing received tweet).
+  *
+  * Simply: enqueueSpent divided by statusCount
+  * Note: by default, calculated fresh for past 60 seconds, every 60 seconds.
+  *
+  * @var float
+  */
+  protected $enqueueTimeMS=0;
+
+  /**
+  * Like $enqueueTimeMS but for the checkFilterPredicates() function.
+  * @var float
+  */
+  protected $filterCheckTimeMS=0;
+
+
   // Config type vars - override in subclass if desired
   protected $connectFailuresMax = 20;
   protected $connectTimeout = 5;
@@ -276,7 +355,6 @@ abstract class Phirehose
       $this->reconnect();
     
       // Init state
-      $statusCount = $filterCheckCount = $enqueueSpent = $filterCheckSpent = $idlePeriod = $maxIdlePeriod = 0;
       $lastAverage = $lastFilterCheck = $lastFilterUpd = $lastStreamActivity = time();
       $fdw = $fde = NULL; // Placeholder write/error file descriptors for stream_select
       
@@ -300,8 +378,8 @@ abstract class Phirehose
           continue; // We need a newline
         }
         // Track maximum idle period
-        $idlePeriod = (time() - $lastStreamActivity);
-        $maxIdlePeriod = ($idlePeriod > $maxIdlePeriod) ? $idlePeriod : $maxIdlePeriod;
+        $this->idlePeriod = (time() - $lastStreamActivity);
+        $this->maxIdlePeriod = ($this->idlePeriod > $this->maxIdlePeriod) ? $this->idlePeriod : $this->maxIdlePeriod;
         // We got a newline, this is stream activity
         $lastStreamActivity = time();
         // Read status length delimiter
@@ -318,12 +396,9 @@ abstract class Phirehose
           }
           // Accrue/enqueue and track time spent enqueing
           $enqueueStart = microtime(TRUE);
-          if($this->enqueueStatus($this->buff)) {
-          $statusCount ++;
-          $enqueueStart = microtime(TRUE);
           $this->enqueueStatus($this->buff);
-          $enqueueSpent += (microtime(TRUE) - $enqueueStart);
-          }
+          $this->enqueueSpent += (microtime(TRUE) - $enqueueStart);
+          $this->statusCount++;
         } else {
           // Timeout/no data after readTimeout seconds
           
@@ -331,21 +406,24 @@ abstract class Phirehose
         // Calc counter averages
         $avgElapsed = time() - $lastAverage;
         if ($avgElapsed >= $this->avgPeriod) {
-          $this->statusRate = round($statusCount / $avgElapsed, 0);          // Calc tweets-per-second
+          $this->statusRate = round($this->statusCount / $avgElapsed, 0);          // Calc tweets-per-second
+          // Calc time spent per enqueue in ms
+          $this->enqueueTimeMS = ($this->statusCount > 0) ? round($this->enqueueSpent / $this->statusCount * 1000, 2) : 0;
+          // Calc time spent total in filter predicate checking
+          $this->filterCheckTimeMS = ($this->filterCheckCount > 0) ? round($this->filterCheckSpent / $this->filterCheckCount * 1000, 2) : 0;
+
           $elapsed = $avgElapsed;
-          $statusRate = $this->statusRate;
-          $enqueueSpentAvg = $enqueueTimeMS;
-          $this->heartbeat(compact('elapsed', 'statusRate', 'statusCount', 'enqueueSpent', 'enqueueSpentAvg', 'filterCheckCount', 'filterCheckSpent', 'idlePeriod', 'maxIdlePeriod'));
-          $this->statusUpdate($lastAverage, $statusCount, $filterCheckCount, $enqueueSpent, $filterCheckSpent, $idlePeriod, $maxIdlePeriod);
+          $this->heartbeat(compact('elapsed', 'XXstatusRate', 'XXstatusCount', 'XXenqueueSpent', 'XXenqueueTimeMS', 'XXfilterCheckCount', 'XXfilterCheckSpent', 'XXidlePeriod', 'XXmaxIdlePeriod'));  //TODO: handle the change from local to class vars here (marked with XX)
+          $this->statusUpdate($lastAverage);
           $lastAverage = time();
         }
         // Check if we're ready to check filter predicates
         if ($this->method == self::METHOD_FILTER && (time() - $lastFilterCheck) >= $this->filterCheckMin) {
-          $filterCheckCount ++;
+          $this->filterCheckCount++;
           $lastFilterCheck = time();
           $filterCheckStart = microtime(TRUE);
           $this->checkFilterPredicates(); // This should be implemented in subclass if required
-          $filterCheckSpent +=  (microtime(TRUE) - $filterCheckStart);
+          $this->filterCheckSpent +=  (microtime(TRUE) - $filterCheckStart);
         }
         // Check if filter is ready + allowed to be updated (reconnect)
         if ($this->filterChanged == TRUE && (time() - $lastFilterUpd) >= $this->filterUpdMin) {
@@ -380,34 +458,21 @@ abstract class Phirehose
    * (if you don't reset them here), or since the last call to this function (if you reset them here).
    *
    * Another input you may want to use is $this->statusRate, which is calculated
-   * freshly before this function is called, and is simply $statusCount divided by $avgElapsed.
+   * freshly before this function is called, and is simply $this->statusCount divided by $avgElapsed.
    *
    * @param Integer $avgElapsed The number of seconds since the previous call to this function.
    *       (Or, if this is the first call, then the number of seconds since the application started up.)
-   * @param Integer $statusCount The number of tweets received (i.e. the number of calls
-   *       to $this->enqueueStatus().
-   * @param Integer $filterCheckCount The number of calls to $this->checkFilterPredicates(). (By
-   *       default this function is called every 5 seconds, so this will typically be 12.)
-   * @param Float $enqueueSpent Total number of seconds (fractional) spent in the enqueueStatus() calls.
-   * @param Float $filterCheckSpent Total number of seconds (fractional) spent in the checkFilterPredicates() calls.
-   * @param Integer $idlePeriod Number of seconds since the last tweet arrived (or the keep-alive newline)
-   * @param Integer $maxIdlePeriod The maximum value $idlePeriod has reached.
-   *
    * @todo Replace usage of $this->avgPeriod with $avgElapsed
    */
-  protected function statusUpdate($avgElapsed, &$statusCount, &$filterCheckCount,
-    &$enqueueSpent, &$filterCheckSpent, &$idlePeriod, &$maxIdlePeriod)
+  protected function statusUpdate($avgElapsed)
   {
-      // Calc time spent per enqueue in ms
-      $enqueueTimeMS = ($statusCount > 0) ? round($enqueueSpent / $statusCount * 1000, 2) : 0;
-      // Calc time spent total in filter predicate checking
-      $filterCheckTimeMS = ($filterCheckCount > 0) ? round($filterCheckSpent / $filterCheckCount * 1000, 2) : 0;
-      $this->log('Consume rate: ' . $this->statusRate . ' status/sec (' . $statusCount . ' total), avg ' . 
-        'enqueueStatus(): ' . $enqueueTimeMS . 'ms, avg checkFilterPredicates(): ' . $filterCheckTimeMS . 'ms (' . 
-        $filterCheckCount . ' total) over ' . $this->avgPeriod . ' seconds, max stream idle period: ' . 
-          $maxIdlePeriod . ' seconds.');
+      $this->log('Consume rate: ' . $this->statusRate . ' status/sec (' . $this->statusCount . ' total), avg ' . 
+        'enqueueStatus(): ' . $this->enqueueTimeMS . 'ms, avg checkFilterPredicates(): ' . $this->filterCheckTimeMS . 'ms (' . 
+        $this->filterCheckCount . ' total) over ' . $this->avgPeriod . ' seconds, max stream idle period: ' . 
+          $this->maxIdlePeriod . ' seconds.');
       // Reset
-      $statusCount = $filterCheckCount = $enqueueSpent = $filterCheckSpent = $idlePeriod = $maxIdlePeriod = 0;
+        $this->statusCount = $this->filterCheckCount = $this->enqueueSpent = 0;
+        $this->filterCheckSpent = $this->idlePeriod = $this->maxIdlePeriod = 0;
   }
   
   /**
@@ -507,7 +572,7 @@ abstract class Phirehose
       if (!$this->conn || !is_resource($this->conn)) {
         $this->lastErrorMsg = $errStr;
         $this->lastErrorNo = $errNo;
-        $connectFailures ++;
+        $connectFailures++;
         if ($connectFailures > $this->connectFailuresMax) {
           $msg = 'TCP failure limit exceeded with ' . $connectFailures . ' failures. Last error: ' . $errStr;
           $this->log($msg,'error');
@@ -572,7 +637,7 @@ abstract class Phirehose
       
       // If we got a non-200 response, we need to backoff and retry
       if ($httpCode != 200) {
-        $connectFailures ++;
+        $connectFailures++;
         
         // Twitter will disconnect on error, but we want to consume the rest of the response body (which is useful)
         while ($bLine = trim(fgets($this->conn, 4096))) {
