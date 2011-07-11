@@ -122,6 +122,15 @@ abstract class Phirehose
   */
   protected $filterCheckTimeMS=0;
 
+  /**
+  * Seconds since the last call to statusUpdate()
+  *
+  * Reset to zero after each call to statusUpdate()
+  * Highest value it should ever reach is $this->avgPeriod
+  *
+  * @var integer
+  */
+  protected $avgElapsed=0;
 
   // Config type vars - override in subclass if desired
   protected $connectFailuresMax = 20;
@@ -404,17 +413,16 @@ abstract class Phirehose
           
         }
         // Calc counter averages
-        $avgElapsed = time() - $lastAverage;
-        if ($avgElapsed >= $this->avgPeriod) {
-          $this->statusRate = round($this->statusCount / $avgElapsed, 0);          // Calc tweets-per-second
+        $this->avgElapsed = time() - $lastAverage;
+        if ($this->avgElapsed >= $this->avgPeriod) {
+          $this->statusRate = round($this->statusCount / $this->avgElapsed, 0);          // Calc tweets-per-second
           // Calc time spent per enqueue in ms
           $this->enqueueTimeMS = ($this->statusCount > 0) ? round($this->enqueueSpent / $this->statusCount * 1000, 2) : 0;
           // Calc time spent total in filter predicate checking
           $this->filterCheckTimeMS = ($this->filterCheckCount > 0) ? round($this->filterCheckSpent / $this->filterCheckCount * 1000, 2) : 0;
 
-          $elapsed = $avgElapsed;
-          $this->heartbeat(compact('elapsed', 'XXstatusRate', 'XXstatusCount', 'XXenqueueSpent', 'XXenqueueTimeMS', 'XXfilterCheckCount', 'XXfilterCheckSpent', 'XXidlePeriod', 'XXmaxIdlePeriod'));  //TODO: handle the change from local to class vars here (marked with XX)
-          $this->statusUpdate($lastAverage);
+          $this->heartbeat();
+          $this->statusUpdate();
           $lastAverage = time();
         }
         // Check if we're ready to check filter predicates
@@ -448,27 +456,15 @@ abstract class Phirehose
   }
 
 
-
   /**
    * Called every $this->avgPeriod (default=60) seconds, and this default implementation
    * calculates some rates, logs them, and resets the counters.
-   *
-   * All parameters, except $avgElapsed, they are passed by reference.
-   * For all these reference parameters, it is the total since either the start of the application
-   * (if you don't reset them here), or since the last call to this function (if you reset them here).
-   *
-   * Another input you may want to use is $this->statusRate, which is calculated
-   * freshly before this function is called, and is simply $this->statusCount divided by $avgElapsed.
-   *
-   * @param Integer $avgElapsed The number of seconds since the previous call to this function.
-   *       (Or, if this is the first call, then the number of seconds since the application started up.)
-   * @todo Replace usage of $this->avgPeriod with $avgElapsed
    */
-  protected function statusUpdate($avgElapsed)
+  protected function statusUpdate()
   {
       $this->log('Consume rate: ' . $this->statusRate . ' status/sec (' . $this->statusCount . ' total), avg ' . 
         'enqueueStatus(): ' . $this->enqueueTimeMS . 'ms, avg checkFilterPredicates(): ' . $this->filterCheckTimeMS . 'ms (' . 
-        $this->filterCheckCount . ' total) over ' . $this->avgPeriod . ' seconds, max stream idle period: ' . 
+        $this->filterCheckCount . ' total) over ' . $this->avgElapsed . ' seconds, max stream idle period: ' . 
           $this->maxIdlePeriod . ' seconds.');
       // Reset
         $this->statusCount = $this->filterCheckCount = $this->enqueueSpent = 0;
@@ -767,10 +763,9 @@ abstract class Phirehose
   /**
    * Reports a periodic heartbeat. Keep execution time minimal.
    *
-   * @param array $data
    * @return NULL
    */
-  public function heartbeat(array $data) {}
+  public function heartbeat() {}
 
 } // End of class
 
