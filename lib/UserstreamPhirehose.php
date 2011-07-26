@@ -47,8 +47,8 @@ abstract class UserstreamPhirehose extends Phirehose {
 	
 	    // Init state
 	    $connectFailures = 0;
-	    $tcpRetry = self::TCP_BACKOFF / 2;
-	    $httpRetry = self::HTTP_BACKOFF / 2;
+	    $tcpRetry = $this->tcpBackoff / 2;
+	    $httpRetry = $this->httpBackoff / 2;
 	
 	    // Keep trying until connected (or max connect failures exceeded)
 	    do {
@@ -114,7 +114,7 @@ abstract class UserstreamPhirehose extends Phirehose {
               throw new PhirehoseConnectLimitExceeded($msg, $errNo); // Throw an exception for other code to handle
 	        }
 	        // Increase retry/backoff up to max
-	        $tcpRetry = ($tcpRetry < self::TCP_BACKOFF_MAX) ? $tcpRetry * 2 : self::TCP_BACKOFF_MAX;
+	        $tcpRetry = ($tcpRetry < $this->tcpBackoffMax) ? $tcpRetry * 2 : $this->tcpBackoffMax;
 	        $this->log('TCP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' .
 	          $errStr . ' (' . $errNo . '). Sleeping for ' . $tcpRetry . ' seconds.','info');
 	        sleep($tcpRetry);
@@ -178,7 +178,7 @@ abstract class UserstreamPhirehose extends Phirehose {
               throw new PhirehoseConnectLimitExceeded($msg, $httpCode); // We eventually throw an exception for other code to handle
 	        }
 	        // Increase retry/backoff up to max
-	        $httpRetry = ($httpRetry < self::HTTP_BACKOFF_MAX) ? $httpRetry * 2 : self::HTTP_BACKOFF_MAX;
+	        $httpRetry = ($httpRetry < $this->httpBackoffMax) ? $httpRetry * 2 : $this->httpBackoffMax;
 	        $this->log('HTTP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' .
 	          $errStr . '. Sleeping for ' . $httpRetry . ' seconds.','info');
 	        sleep($httpRetry);
@@ -211,8 +211,8 @@ abstract class UserstreamPhirehose extends Phirehose {
 	
 	    // Init state
 	    $connectFailures = 0;
-	    $tcpRetry = self::TCP_BACKOFF / 2;
-	    $httpRetry = self::HTTP_BACKOFF / 2;
+	    $tcpRetry = $this->tcpBackoff / 2;
+	    $httpRetry = $this->httpBackoff / 2;
 	
 	    // Keep trying until connected (or max connect failures exceeded)
 	    do {
@@ -278,7 +278,7 @@ abstract class UserstreamPhirehose extends Phirehose {
               throw new PhirehoseConnectLimitExceeded($msg, $errNo); // Throw an exception for other code to handle
 	        }
 	        // Increase retry/backoff up to max
-	        $tcpRetry = ($tcpRetry < self::TCP_BACKOFF_MAX) ? $tcpRetry * 2 : self::TCP_BACKOFF_MAX;
+	        $tcpRetry = ($tcpRetry < $this->tcpBackoffMax) ? $tcpRetry * 2 : $this->tcpBackoffMax;
 	        $this->log('TCP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' .
 	          $errStr . ' (' . $errNo . '). Sleeping for ' . $tcpRetry . ' seconds.','info');
 	        sleep($tcpRetry);
@@ -358,7 +358,7 @@ abstract class UserstreamPhirehose extends Phirehose {
               throw new PhirehoseConnectLimitExceeded($msg, $httpCode); // We eventually throw an exception for other code to handle
 	        }
 	        // Increase retry/backoff up to max
-	        $httpRetry = ($httpRetry < self::HTTP_BACKOFF_MAX) ? $httpRetry * 2 : self::HTTP_BACKOFF_MAX;
+	        $httpRetry = ($httpRetry < $this->httpBackoffMax) ? $httpRetry * 2 : $this->httpBackoffMax;
 	        $this->log('HTTP failure ' . $connectFailures . ' of ' . $this->connectFailuresMax . ' connecting to stream: ' .
 	          $errStr . '. Sleeping for ' . $httpRetry . ' seconds.','info');
 	        sleep($httpRetry);
