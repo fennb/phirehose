@@ -14,7 +14,7 @@ abstract class Phirehose
   /**
    * Class constants
    */
-  const URL_BASE         = 'http://stream.twitter.com/1/statuses/';
+  const URL_BASE         = 'https://stream.twitter.com/1/statuses/';
   const FORMAT_JSON      = 'json';
   const FORMAT_XML       = 'xml';
   const METHOD_FILTER    = 'filter';
@@ -139,7 +139,7 @@ abstract class Phirehose
   protected $idleReconnectTimeout = 90;
   protected $avgPeriod = 60;
   protected $status_length_base = 10;
-  protected $userAgent       = 'Phirehose/0.2.4 +http://code.google.com/p/phirehose/';
+  protected $userAgent       = 'Phirehose/0.2.gitmaster +https://github.com/fennb/phirehose';
   protected $filterCheckMin = 5;
   protected $filterUpdMin   = 120;
   protected $tcpBackoff      = 1;
