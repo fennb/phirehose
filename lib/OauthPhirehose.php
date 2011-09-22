@@ -2,7 +2,6 @@
 
 abstract class OauthPhirehose extends Phirehose
 {
-	const URL_BASE = 'http://stream.twitter.com/1/statuses/';
 
 	protected $auth_method;
 
