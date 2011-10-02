@@ -560,7 +560,7 @@ abstract class Phirehose
       // Choose one randomly (if more than one)
       $this->log('Resolved host ' . $urlParts['host'] . ' to ' . implode(', ', $streamIPs));
       $streamIP = $streamIPs[rand(0, (count($streamIPs) - 1))];
-      $this->log('Connecting to ' . $streamIP);
+      $this->log("Connecting to {$scheme}{$streamIP}, port={$port}, connectTimeout={$this->connectTimeout}");
       
       @$this->conn = fsockopen($scheme . $streamIP, $port, $errNo, $errStr, $this->connectTimeout);
   
