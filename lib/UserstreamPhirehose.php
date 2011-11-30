@@ -7,7 +7,6 @@ abstract class UserstreamPhirehose extends Phirehose {
         const CONNECT_OAUTH    = 'oauth';
         const CONNECT_BASIC    = 'basic';
 	
-	protected $status_length_base = 16;	// for some reason, the userstream uses hexadecimal status lengths
         protected $auth_method;
 	
 	
@@ -297,13 +296,13 @@ abstract class UserstreamPhirehose extends Phirehose {
 	      $postData = http_build_query($requestParams);
 	      
 	      // Oauth tokens
-	      $oauthHeader = $this->getOAuthHeader('POST', $url);
+	      $oauthHeader = $this->getOAuthHeader('POST', $url, $requestParams);
 	      
 	      // Do it
-	      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.1\r\n");
+	      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.0\r\n");
 	      fwrite($this->conn, "Host: " . $urlParts['host'].':'.$port . "\r\n");
-	      #fwrite($this->conn, "Content-type: application/x-www-form-urlencoded\r\n");
-	      #fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
+	      fwrite($this->conn, "Content-type: application/x-www-form-urlencoded\r\n");
+	      fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
 	      #fwrite($this->conn, "Accept: */*\r\n");
 	      #fwrite($this->conn, 'Authorization: Basic ' . $authCredentials . "\r\n");
 	      fwrite($this->conn, $oauthHeader."\r\n");
@@ -312,10 +311,10 @@ abstract class UserstreamPhirehose extends Phirehose {
 	      fwrite($this->conn, $postData . "\r\n");
 	      fwrite($this->conn, "\r\n");
 
-	      $this->log("POST " . $urlParts['path'] . " HTTP/1.1");
+	      $this->log("POST " . $urlParts['path'] . " HTTP/1.0");
 	      $this->log("Host: " . $urlParts['host'].':'.$port);
-	      #$this->log("Content-type: application/x-www-form-urlencoded");
-	      #$this->log("Content-length: " . strlen($postData));
+	      $this->log("Content-type: application/x-www-form-urlencoded");
+	      $this->log("Content-length: " . strlen($postData));
 	      #$this->log("Accept: */*");
 	      #$this->log('Authorization: Basic ' . $authCredentials);
 	      $this->log($oauthHeader);
@@ -486,8 +485,8 @@ abstract class UserstreamPhirehose extends Phirehose {
 	}
 	
 	
-	protected function getOAuthHeader($method, $url) {
-		$params = $this->prepareParameters($method, $url);
+	protected function getOAuthHeader($method, $url, $data) {
+		$params = $this->prepareParameters($method, $url, $data);
 		$oauthHeaders = $params['oauth'];
 	    $urlParts = parse_url($url);
 	    $oauth = 'Authorization: OAuth realm="' . $urlParts['scheme'] . '://' . $urlParts['host'] . $urlParts['path'] . '", ';
