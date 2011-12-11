@@ -6,6 +6,7 @@ abstract class UserstreamPhirehose extends Phirehose {
   const METHOD_USER      = 'user';
   const CONNECT_OAUTH    = 'oauth';
   const CONNECT_BASIC    = 'basic';
+  const USER_AGENT       = 'Phirehose (https://github.com/fennb/phirehose)';
 
   protected $auth_method;
   
