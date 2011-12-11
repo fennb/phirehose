@@ -35,7 +35,7 @@ class MyUserConsumer extends UserstreamPhirehose
      *  should be being enqueued and processed asyncronously from the collection process. 
      */
     $data = json_decode($status, true);
-    echo date("Y-m-d H:i:s (").$sz."):".print_r($data,true)."\n";
+    echo date("Y-m-d H:i:s (").strlen($status)."):".print_r($data,true)."\n";
   }
 
 }
