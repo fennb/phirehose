@@ -9,6 +9,7 @@ abstract class UserstreamPhirehose extends Phirehose {
   const USER_AGENT       = 'Phirehose (https://github.com/fennb/phirehose)';
 
   protected $auth_method;
+  protected $consume_all_at_replies = FALSE;
   
   public static function Initialize($basic_username = NULL, $basic_password = NULL, $oauth_token = NULL, $oauth_secret = NULL) {
     if (! self::$instance instanceof UserstreamPhirehose) {
@@ -61,6 +62,12 @@ abstract class UserstreamPhirehose extends Phirehose {
       }
       if ($this->method == self::METHOD_USER && count($this->followIds) > 0) {
         $requestParams['follow'] = implode(',', $this->followIds);
+      }
+
+      // Allow us to watch all mentions of our followees
+      // Subclasses may override the default false value:
+      if ($this->consume_all_at_replies) {
+        $requestParams['replies'] = 'all';
       }
   
   
