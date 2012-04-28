@@ -21,6 +21,7 @@ abstract class Phirehose
   const METHOD_SAMPLE    = 'sample';
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
+  const METHOD_LINKS     = 'links';
   const EARTH_RADIUS_KM  = 6371;
   
   
@@ -149,7 +150,7 @@ abstract class Phirehose
   
   /**
    * Create a new Phirehose object attached to the appropriate twitter stream method.
-   * Methods are: METHOD_FIREHOSE, METHOD_RETWEET, METHOD_SAMPLE, METHOD_FILTER
+   * Methods are: METHOD_FIREHOSE, METHOD_RETWEET, METHOD_SAMPLE, METHOD_FILTER, METHOD_LINKS
    * Formats are: FORMAT_JSON, FORMAT_XML
    * @see Phirehose::METHOD_SAMPLE
    * @see Phirehose::FORMAT_JSON
@@ -335,7 +336,7 @@ abstract class Phirehose
   /**
    * Sets the number of previous statuses to stream before transitioning to the live stream. Applies only to firehose
    * and filter + track methods. This is generally used internally and should not be needed by client applications.
-   * Applies to: METHOD_FILTER, METHOD_FIREHOSE
+   * Applies to: METHOD_FILTER, METHOD_FIREHOSE, METHOD_LINKS
    *
    * @param integer $count
    */
