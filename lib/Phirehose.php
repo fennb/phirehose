@@ -205,7 +205,7 @@ abstract class Phirehose
    *
    * @param array $trackWords
    */
-  public function setTrack($trackWords)
+  public function setTrack(array $trackWords)
   {
     $trackWords = ($trackWords === NULL) ? array() : $trackWords;
     sort($trackWords); // Non-optimal, but necessary
