@@ -399,7 +399,11 @@ abstract class Phirehose
         if ($statusLength > 0) {
           // Read status bytes and enqueue
           $bytesLeft = $statusLength - strlen($this->buff);
-          while ($bytesLeft > 0 && $this->conn !== NULL && !feof($this->conn) && ($numChanged = stream_select($this->fdrPool, $fdw, $fde, 0, 20000)) !== FALSE) {
+          while ( $bytesLeft > 0 
+                  && $this->conn !== NULL 
+                  && !feof($this->conn) 
+                  && ($numChanged = stream_select($this->fdrPool, $fdw, $fde, 0, 20000)) !== FALSE 
+                  && (time() - $lastStreamActivity) <= $this->idleReconnectTimeout) {  
             $this->fdrPool = array($this->conn); // Reassign
             $this->buff .= fread($this->conn, $bytesLeft); // Read until all bytes are read into buffer
             $bytesLeft = ($statusLength - strlen($this->buff));
