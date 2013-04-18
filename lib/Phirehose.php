@@ -447,15 +447,15 @@ abstract class Phirehose
         
       } // End while-stream-activity
 
+      if (function_exists('pcntl_signal_dispatch')) {
+        pcntl_signal_dispatch();
+      }
+
       // Some sort of socket error has occured
       $this->lastErrorNo = is_resource($this->conn) ? @socket_last_error($this->conn) : NULL;
       $this->lastErrorMsg = ($this->lastErrorNo > 0) ? @socket_strerror($this->lastErrorNo) : 'Socket disconnected';
       $this->log('Phirehose connection error occured: ' . $this->lastErrorMsg,'error');
 
-      if (function_exists('pcntl_signal_dispatch')) {
-        pcntl_signal_dispatch();
-      }
-      
       // Reconnect
     } while ($this->reconnect);
 
