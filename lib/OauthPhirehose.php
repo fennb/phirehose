@@ -151,6 +151,13 @@ abstract class OauthPhirehose extends Phirehose
 		{
 			$requestParams['follow'] = implode(',', $this->followIds);
 		}
+		if (count($this->locationBoxes) > 0)
+		{
+			$requestParams['locations'] = implode(',', $this->locationBoxes);
+		}
+		if (count($this->count) <> 0) {
+			$requestParams['count'] = $this->count;
+		}
 
 		return $this->getOAuthHeader('POST', $url, $requestParams);
 	}
