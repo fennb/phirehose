@@ -23,20 +23,20 @@ class FilterTrackConsumer extends OauthPhirehose
     if (is_array($data) && isset($data['user']['screen_name'])) {
       print $data['user']['screen_name'] . ': ' . urldecode($data['text']) . "\n";
     }
-		exit;
+		//exit;
   }
 }
 
 // The OAuth credentials you received when registering your app at Twitter
-define("TWITTER_CONSUMER_KEY", "");
-define("TWITTER_CONSUMER_SECRET", "");
+define("TWITTER_CONSUMER_KEY", "XRolVaUgOklb51AFWHvV8Q");
+define("TWITTER_CONSUMER_SECRET", "CjNWkR1uUxSK1iOWS4NZi7abVxb8j3DlZ7BYkcq0U");
 
 
 // The OAuth data for the twitter account
-define("OAUTH_TOKEN", "");
-define("OAUTH_SECRET", "");
+define("OAUTH_TOKEN", "1423460918-X0p1z3FzgHmzsCI11vv2OsVC6yPSisQS3Ofjcd7");
+define("OAUTH_SECRET", "gUwWpUjhAntK7LddHE5PeNa1iuP6wqu9hOaPaYs6I");
 
 // Start streaming
-$sc = new FilterTrackConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_FILTER);
-$sc->setTrack(array('morning', 'goodnight', 'hello', 'the'));
+$sc = new FilterTrackConsumer("1423460918-X0p1z3FzgHmzsCI11vv2OsVC6yPSisQS3Ofjcd7", "gUwWpUjhAntK7LddHE5PeNa1iuP6wqu9hOaPaYs6I", Phirehose::METHOD_SAMPLE);
+//$sc->setTrack(array('morning', 'goodnight', 'hello', 'the'));
 $sc->consume();
