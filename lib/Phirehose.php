@@ -160,12 +160,13 @@ abstract class Phirehose
    * @param string $method
    * @param string $format
    */
-  public function __construct($username, $password, $method = Phirehose::METHOD_SAMPLE, $format = self::FORMAT_JSON)
+  public function __construct($username, $password, $method = Phirehose::METHOD_SAMPLE, $format = self::FORMAT_JSON, $lang = FALSE)
   {
     $this->username = $username;
     $this->password = $password;
     $this->method = $method;
     $this->format = $format;
+    $this->lang = $lang;
   }
   
   /**
@@ -343,6 +344,26 @@ abstract class Phirehose
   public function setCount($count)
   {
     $this->count = $count;
+  }
+
+  /**
+   * Restricts tweets to the given language, given by an ISO 639-1 code (http://en.wikipedia.org/wiki/List_of_ISO_639-1_codes).
+   *
+   * @param string $lang
+   */
+  public function setLang($lang)
+  {
+    $this->lang = $lang;
+  }
+
+  /**
+   * Returns the ISO 639-1 code formatted language string of the current setting. (http://en.wikipedia.org/wiki/List_of_ISO_639-1_codes).
+   *
+   * @param string $lang
+   */
+  public function getLang()
+  {
+    return $this->lang;
   }
   
   /**
@@ -530,6 +551,11 @@ abstract class Phirehose
       
       // Setup params appropriately
       $requestParams = array('delimited' => 'length');
+
+      // Setup the language of the stream
+      if($this->lang) {
+        $requestParams['language'] = $this->lang;
+      }
       
       // Filter takes additional parameters
       if ($this->method == self::METHOD_FILTER && count($this->trackWords) > 0) {
