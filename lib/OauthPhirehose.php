@@ -142,6 +142,11 @@ abstract class OauthPhirehose extends Phirehose
 		// Setup params appropriately
 		$requestParams = array('delimited' => 'length');
 
+		// Setup the language of the stream
+		if($this->lang) {
+			$requestParams['language'] = $this->lang;
+		}
+
 		// Filter takes additional parameters
 		if (count($this->trackWords) > 0)
 		{
