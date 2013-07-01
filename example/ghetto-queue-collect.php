@@ -10,7 +10,7 @@ require_once('../lib/Phirehose.php');
  * keep this low - ie: 5-10 seconds. If you're doing analytics, you should rotate less often (perhaps every hour or so).
  * 
  */
-class GhettoQueueCollector extends Phirehose
+class GhettoQueueCollector extends extends OauthPhirehose
 {
   
   /**
@@ -140,7 +140,16 @@ class GhettoQueueCollector extends Phirehose
   
 } // End of class
 
+// The OAuth credentials you received when registering your app at Twitter
+define("TWITTER_CONSUMER_KEY", "");
+define("TWITTER_CONSUMER_SECRET", "");
+
+
+// The OAuth data for the twitter account
+define("OAUTH_TOKEN", "");
+define("OAUTH_SECRET", "");
+
 // Start streaming/collecting
-$sc = new GhettoQueueCollector('username', 'password');
+$sc = new GhettoQueueCollector(OAUTH_TOKEN, OAUTH_SECRET);
 $sc->setTrack(array('morning', 'goodnight', 'hello', 'the', 'and'));
 $sc->consume();

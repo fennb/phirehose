@@ -3,7 +3,7 @@ require_once('../lib/Phirehose.php');
 /**
  * Example of using Phirehose to display a live filtered stream using track words 
  */
-class FilterTrackConsumer extends Phirehose
+class FilterTrackConsumer extends OauthPhirehose
 {
   /**
    * Enqueue each status
@@ -24,7 +24,16 @@ class FilterTrackConsumer extends Phirehose
   }
 }
 
+// The OAuth credentials you received when registering your app at Twitter
+define("TWITTER_CONSUMER_KEY", "");
+define("TWITTER_CONSUMER_SECRET", "");
+
+
+// The OAuth data for the twitter account
+define("OAUTH_TOKEN", "");
+define("OAUTH_SECRET", "");
+
 // Start streaming
-$sc = new FilterTrackConsumer('username', 'password', Phirehose::METHOD_FILTER);
+$sc = new FilterTrackConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_FILTER);
 $sc->setTrack(array('morning', 'goodnight', 'hello', 'the'));
 $sc->consume();
