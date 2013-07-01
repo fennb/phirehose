@@ -3,7 +3,7 @@ require_once('../lib/Phirehose.php');
 /**
  * Example of using Phirehose to display the 'sample' twitter stream. 
  */
-class SampleConsumer extends Phirehose
+class SampleConsumer extends OauthPhirehose
 {
   /**
    * Enqueue each status
@@ -24,6 +24,15 @@ class SampleConsumer extends Phirehose
   }
 }
 
+// The OAuth credentials you received when registering your app at Twitter
+define("TWITTER_CONSUMER_KEY", "");
+define("TWITTER_CONSUMER_SECRET", "");
+
+
+// The OAuth data for the twitter account
+define("OAUTH_TOKEN", "");
+define("OAUTH_SECRET", "");
+
 // Start streaming
-$sc = new SampleConsumer('username', 'password', Phirehose::METHOD_SAMPLE);
+$sc = new FilterTrackConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_FILTER);
 $sc->consume();
