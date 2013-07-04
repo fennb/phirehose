@@ -34,5 +34,5 @@ define("OAUTH_TOKEN", "");
 define("OAUTH_SECRET", "");
 
 // Start streaming
-$sc = new FilterTrackConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_FILTER);
+$sc = new SampleConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_FILTER);
 $sc->consume();
