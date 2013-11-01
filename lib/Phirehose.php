@@ -656,6 +656,7 @@ abstract class Phirehose
       // Do it
       $s = "POST " . $urlParts['path'] . " HTTP/1.1\r\n";
       $s.= "Host: " . $urlParts['host'] . ':' . $port . "\r\n";
+      $s .= "Connection: Close\r\n";
       $s.= "Content-type: application/x-www-form-urlencoded\r\n";
       $s.= "Content-length: " . strlen($postData) . "\r\n";
       $s.= "Accept: */*\r\n";
