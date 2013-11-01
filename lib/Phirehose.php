@@ -640,37 +640,31 @@ abstract class Phirehose
       $authCredentials = $this->getAuthorizationHeader();
       
       // Do it
-      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.0\r\n");
-      fwrite($this->conn, "Host: " . $urlParts['host'] . ':' . $port . "\r\n");
-      fwrite($this->conn, "Content-type: application/x-www-form-urlencoded\r\n");
-      fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
-      fwrite($this->conn, "Accept: */*\r\n");
-      fwrite($this->conn, 'Authorization: ' . $authCredentials . "\r\n");
-      fwrite($this->conn, 'User-Agent: ' . $this->userAgent . "\r\n");
-      fwrite($this->conn, "\r\n");
-      fwrite($this->conn, $postData . "\r\n");
-      fwrite($this->conn, "\r\n");
+      $s = "POST " . $urlParts['path'] . " HTTP/1.1\r\n";
+      $s.= "Host: " . $urlParts['host'] . ':' . $port . "\r\n";
+      $s.= "Content-type: application/x-www-form-urlencoded\r\n";
+      $s.= "Content-length: " . strlen($postData) . "\r\n";
+      $s.= "Accept: */*\r\n";
+      $s.= 'Authorization: ' . $authCredentials . "\r\n";
+      $s.= 'User-Agent: ' . $this->userAgent . "\r\n";
+      $s.= "\r\n";
+      $s.= $postData . "\r\n";
+      $s.= "\r\n";
       
-      $this->log("POST " . $urlParts['path'] . " HTTP/1.0\r\n");
-      $this->log("Host: " . $urlParts['host'] . ':' . $port . "\r\n");
-      $this->log("Content-type: application/x-www-form-urlencoded\r\n");
-      $this->log("Content-length: " . strlen($postData) . "\r\n");
-      $this->log("Accept: */*\r\n");
-      $this->log('Authorization: ' . $authCredentials . "\r\n");
-      $this->log('User-Agent: ' . $this->userAgent . "\r\n");
-      $this->log("\r\n");
-      $this->log($postData . "\r\n");
-      $this->log("\r\n");
+      fwrite($this->conn, $s);
+      $this->log($s);
       
       // First line is response
       list($httpVer, $httpCode, $httpMessage) = preg_split('/\s+/', trim(fgets($this->conn, 1024)), 3);
       
       // Response buffers
       $respHeaders = $respBody = '';
+      $isChunking = false;
 
       // Consume each header response line until we get to body
       while ($hLine = trim(fgets($this->conn, 4096))) {
         $respHeaders .= $hLine;
+        if($hLine=='Transfer-Encoding: chunked')$chunking=true;
       }
       
       // If we got a non-200 response, we need to backoff and retry
@@ -678,6 +672,7 @@ abstract class Phirehose
         $connectFailures++;
         
         // Twitter will disconnect on error, but we want to consume the rest of the response body (which is useful)
+        //TODO: this might be chunked too? In which case this contains some bad characters??
         while ($bLine = trim(fgets($this->conn, 4096))) {
           $respBody .= $bLine;
         }
@@ -703,6 +698,8 @@ abstract class Phirehose
         continue;
         
       } // End if not http 200
+
+      if(!$isChunking)throw new Exception("Twitter did not send a chunking header. Is this really HTTP/1.1");   //TODO: rather crude!
       
       // Loop until connected OK
     } while (!is_resource($this->conn) || $httpCode != 200);
