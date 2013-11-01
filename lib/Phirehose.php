@@ -394,8 +394,13 @@ abstract class Phirehose
       $fdw = $fde = NULL; // Placeholder write/error file descriptors for stream_select
       
       // We use a blocking-select with timeout, to allow us to continue processing on idle streams
+      //TODO: there is a bug lurking here. If $this->conn is fine, but $numChanged returns zero, because readTimeout was
+      //    reached, then we should consider we still need to call statusUpdate() every 60 seconds, etc.
+      //     ($this->readTimeout is 5 seconds.) This can be quite annoying. E.g. Been getting data regularly for 55 seconds,
+      //     then it goes quiet for just 10 or so seconds. It is now 65 seconds since last call to statusUpdate() has been
+      //     called, which might mean a monitoring system kills the script assuming it has died.
       while ($this->conn !== NULL && !feof($this->conn) &&
-            ($numChanged = stream_select($this->fdrPool, $fdw, $fde, $this->readTimeout)) !== FALSE) {
+        ($numChanged = stream_select($this->fdrPool, $fdw, $fde, $this->readTimeout)) !== FALSE) {
         /* Unfortunately, we need to do a safety check for dead twitter streams - This seems to be able to happen where
          * you end up with a valid connection, but NO tweets coming along the wire (or keep alives). The below guards
          * against this.
@@ -409,40 +414,49 @@ abstract class Phirehose
         }
         // Process stream/buffer
         $this->fdrPool = array($this->conn); // Must reassign for stream_select()
-        $this->buff .= fread($this->conn, 6); // Small non-blocking to get delimiter text
-        if (($eol = strpos($this->buff, "\r\n")) === FALSE) {
-          continue; // We need a newline
-        }
+
+        //Get a full HTTP chunk.
+        //NB. This is a tight loop, not using stream_select.
+        //NB. If that causes problems, then perhaps put something to give up after say trying for 10 seconds? (but
+        //   the stream will be all messed up, so will need to do a reconnect).
+        $chunk_info=trim(fgets($this->conn)); //First line is hex digits giving us the length
+        if($chunk_info=='')continue;    //Usually indicates a time-out. If we wanted to be sure,
+          //then stream_get_meta_data($this->conn)['timed_out']==1.  (We could instead
+          //   look at the 'eof' member, which appears to be boolean false if just a time-out.)
+          //TODO: need to consider calling statusUpdate() every 60 seconds, etc.
+
         // Track maximum idle period
+        // (We got start of an HTTP chunk, this is stream activity)
         $this->idlePeriod = (time() - $lastStreamActivity);
         $this->maxIdlePeriod = ($this->idlePeriod > $this->maxIdlePeriod) ? $this->idlePeriod : $this->maxIdlePeriod;
-        // We got a newline, this is stream activity
         $lastStreamActivity = time();
-        // Read status length delimiter
-        $delimiter = substr($this->buff, 0, $eol);
-        $this->buff = substr($this->buff, $eol + 2); // consume off buffer, + 2 = "\r\n"
-        $statusLength = intval($delimiter, $this->status_length_base);
-        if ($statusLength > 0) {
-          // Read status bytes and enqueue
-          $bytesLeft = $statusLength - strlen($this->buff);
-          while ( $bytesLeft > 0 
-                  && $this->conn !== NULL 
-                  && !feof($this->conn) 
-                  && ($numChanged = stream_select($this->fdrPool, $fdw, $fde, 0, 20000)) !== FALSE 
-                  && (time() - $lastStreamActivity) <= $this->idleReconnectTimeout) {  
-            $this->fdrPool = array($this->conn); // Reassign
-            $this->buff .= fread($this->conn, $bytesLeft); // Read until all bytes are read into buffer
-            $bytesLeft = ($statusLength - strlen($this->buff));
-          }
-          // Accrue/enqueue and track time spent enqueing
-          $enqueueStart = microtime(TRUE);
-          $this->enqueueStatus($this->buff);
-          $this->enqueueSpent += (microtime(TRUE) - $enqueueStart);
-          $this->statusCount++;
-        } else {
-          // Timeout/no data after readTimeout seconds
-          
+
+        //Append one HTTP chunk to $this->buff
+        $len=hexdec($chunk_info);   //$len includes the \r\n at the end of the chunk (despite what wikipedia says)
+        //TODO: could do a check for data corruption here. E.g. if($len>100000){...}
+        $s='';
+        $len+=2;    //For the \r\n at the end of the chunk
+        while(!feof($this->conn)){
+           $s.=fread($this->conn,$len-strlen($s));
+           if(strlen($s)>=$len)break;  //TODO: Can never be >$len, only ==$len??
+           }
+        $this->buff.=substr($s,0,-2);   //This is our HTTP chunk
+
+        //Process each full tweet inside $this->buff
+        while(1){
+           $eol = strpos($this->buff,"\r\n");  //Find next line ending
+           if($eol===false)break;   //Time to get more data
+           $enqueueStart = microtime(TRUE);
+           $this->enqueueStatus(substr($this->buff,0,$eol));
+           $this->enqueueSpent += (microtime(TRUE) - $enqueueStart);
+           $this->statusCount++;
+           $this->buff = substr($this->buff,$eol);
         }
+
+        //NOTE: if $this->buff is not empty, it is tempting to go round and get the next HTTP chunk, as
+        //  we know there is data on the incoming stream. However, this could mean the below functions (heartbeat
+        //  and statusUpdate) *never* get called, which would be bad.
+
         // Calc counter averages
         $this->avgElapsed = time() - $lastAverage;
         if ($this->avgElapsed >= $this->avgPeriod) {
@@ -557,7 +571,7 @@ abstract class Phirehose
       $urlParts = parse_url($url);
       
       // Setup params appropriately
-      $requestParams = array('delimited' => 'length');
+      //$requestParams = array('delimited' => 'length');    //No, we don't want this any more
 
       // Setup the language of the stream
       if($this->lang) {
