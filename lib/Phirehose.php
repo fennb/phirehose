@@ -370,6 +370,10 @@ abstract class Phirehose
    * Connects to the stream API and consumes the stream. Each status update in the stream will cause a call to the
    * handleStatus() method.
    *
+   * Note: in normal use this function does not return.
+   * If you pass $reconnect as false, it will still not return in normal use: it will only return
+   *   if the remote side (Twitter) close the socket. (Or the socket dies for some other external reason.)
+   *
    * @see handleStatus()
    * @param boolean $reconnect Reconnects as per recommended
    * @throws ErrorException
@@ -390,7 +394,8 @@ abstract class Phirehose
       $fdw = $fde = NULL; // Placeholder write/error file descriptors for stream_select
       
       // We use a blocking-select with timeout, to allow us to continue processing on idle streams
-      while ($this->conn !== NULL && !feof($this->conn) && ($numChanged = stream_select($this->fdrPool, $fdw, $fde, $this->readTimeout)) !== FALSE) {
+      while ($this->conn !== NULL && !feof($this->conn) &&
+            ($numChanged = stream_select($this->fdrPool, $fdw, $fde, $this->readTimeout)) !== FALSE) {
         /* Unfortunately, we need to do a safety check for dead twitter streams - This seems to be able to happen where
          * you end up with a valid connection, but NO tweets coming along the wire (or keep alives). The below guards
          * against this.
@@ -443,9 +448,11 @@ abstract class Phirehose
         if ($this->avgElapsed >= $this->avgPeriod) {
           $this->statusRate = round($this->statusCount / $this->avgElapsed, 0);          // Calc tweets-per-second
           // Calc time spent per enqueue in ms
-          $this->enqueueTimeMS = ($this->statusCount > 0) ? round($this->enqueueSpent / $this->statusCount * 1000, 2) : 0;
+          $this->enqueueTimeMS = ($this->statusCount > 0) ?
+            round($this->enqueueSpent / $this->statusCount * 1000, 2) : 0;
           // Calc time spent total in filter predicate checking
-          $this->filterCheckTimeMS = ($this->filterCheckCount > 0) ? round($this->filterCheckSpent / $this->filterCheckCount * 1000, 2) : 0;
+          $this->filterCheckTimeMS = ($this->filterCheckCount > 0) ?
+            round($this->filterCheckSpent / $this->filterCheckCount * 1000, 2) : 0;
 
           $this->heartbeat();
           $this->statusUpdate();
