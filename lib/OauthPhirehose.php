@@ -142,6 +142,11 @@ abstract class OauthPhirehose extends Phirehose
 		// Setup params appropriately
 		$requestParams = array('delimited' => 'length');
 
+		// Setup the language of the stream
+		if($this->lang) {
+			$requestParams['language'] = $this->lang;
+		}
+
 		// Filter takes additional parameters
 		if (count($this->trackWords) > 0)
 		{
@@ -150,6 +155,13 @@ abstract class OauthPhirehose extends Phirehose
 		if (count($this->followIds) > 0)
 		{
 			$requestParams['follow'] = implode(',', $this->followIds);
+		}
+		if (count($this->locationBoxes) > 0)
+		{
+			$requestParams['locations'] = implode(',', $this->locationBoxes);
+		}
+		if (count($this->count) <> 0) {
+			$requestParams['count'] = $this->count;
 		}
 
 		return $this->getOAuthHeader('POST', $url, $requestParams);
