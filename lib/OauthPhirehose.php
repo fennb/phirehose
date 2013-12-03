@@ -30,7 +30,7 @@ abstract class OauthPhirehose extends Phirehose
 		$oauth['oauth_nonce'] = md5(uniqid(rand(), true));
 		$oauth['oauth_signature_method'] = 'HMAC-SHA1';
 		$oauth['oauth_timestamp'] = time();
-		$oauth['oauth_version'] = '1.0';
+		$oauth['oauth_version'] = '1.0A';
 		$oauth['oauth_token'] = $this->username;
 		if (isset($params['oauth_verifier']))
 		{
