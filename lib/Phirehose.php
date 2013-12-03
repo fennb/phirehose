@@ -633,7 +633,7 @@ abstract class Phirehose
       $authCredentials = $this->getAuthorizationHeader();
       
       // Do it
-      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.0\r\n");
+      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.1\r\n");
       fwrite($this->conn, "Host: " . $urlParts['host'] . ':' . $port . "\r\n");
       fwrite($this->conn, "Content-type: application/x-www-form-urlencoded\r\n");
       fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
@@ -644,7 +644,7 @@ abstract class Phirehose
       fwrite($this->conn, $postData . "\r\n");
       fwrite($this->conn, "\r\n");
       
-      $this->log("POST " . $urlParts['path'] . " HTTP/1.0\r\n");
+      $this->log("POST " . $urlParts['path'] . " HTTP/1.1\r\n");
       $this->log("Host: " . $urlParts['host'] . ':' . $port . "\r\n");
       $this->log("Content-type: application/x-www-form-urlencoded\r\n");
       $this->log("Content-length: " . strlen($postData) . "\r\n");
