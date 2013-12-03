@@ -129,7 +129,7 @@ abstract class UserstreamPhirehose extends Phirehose {
       $postData = http_build_query($requestParams);
       
       // Do it
-      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.0\r\n");
+      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.1\r\n");
       fwrite($this->conn, "Host: " . $urlParts['host'] . "\r\n");
       fwrite($this->conn, "Content-type: application/x-www-form-urlencoded\r\n");
       fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
@@ -296,7 +296,7 @@ abstract class UserstreamPhirehose extends Phirehose {
       $oauthHeader = $this->getOAuthHeader('POST', $url, $requestParams);
       
       // Do it
-      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.0\r\n");
+      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.1\r\n");
       fwrite($this->conn, "Host: " . $urlParts['host'].':'.$port . "\r\n");
       fwrite($this->conn, "Content-type: application/x-www-form-urlencoded\r\n");
       fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
@@ -306,7 +306,7 @@ abstract class UserstreamPhirehose extends Phirehose {
       fwrite($this->conn, $postData . "\r\n");
       fwrite($this->conn, "\r\n");
 
-      $this->log("POST " . $urlParts['path'] . " HTTP/1.0");
+      $this->log("POST " . $urlParts['path'] . " HTTP/1.1");
       $this->log("Host: " . $urlParts['host'].':'.$port);
       $this->log("Content-type: application/x-www-form-urlencoded");
       $this->log("Content-length: " . strlen($postData));
@@ -394,7 +394,7 @@ abstract class UserstreamPhirehose extends Phirehose {
       $oauth['oauth_verifier'] = $params['oauth_verifier'];
       unset($params['oauth_verifier']);
     }
-    $oauth['oauth_version'] = '1.0';
+    $oauth['oauth_version'] = '1.0A';
     // encode all oauth values
     foreach($oauth as $k => $v)
       $oauth[$k] = $this->encode_rfc3986($v);
