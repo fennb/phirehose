@@ -740,6 +740,7 @@ abstract class Phirehose
 
 	protected function getAuthorizationHeader($url,$requestParams)
 	{
+        throw new Exception("Basic auth no longer works with Twitter. You must derive from OauthPhirehose, not directly from the Phirehose class.");
 		$authCredentials = base64_encode($this->username . ':' . $this->password);
 		return "Basic: ".$authCredentials;
 	}
