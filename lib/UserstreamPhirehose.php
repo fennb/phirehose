@@ -2,12 +2,14 @@
 
 abstract class UserstreamPhirehose extends Phirehose {
 
-  const URL_BASE         = 'https://userstream.twitter.com/2/';
+  const URL_BASE         = 'https://userstream.twitter.com/1.1/';
   const METHOD_USER      = 'user';
   const CONNECT_OAUTH    = 'oauth';
   const CONNECT_BASIC    = 'basic';
   const USER_AGENT       = 'Phirehose (https://github.com/fennb/phirehose)';
 
+  protected $consumerKey;
+  protected $consumerSecret;
   protected $auth_method;
   
   public static function Initialize($basic_username = NULL, $basic_password = NULL, $oauth_token = NULL, $oauth_secret = NULL) {
@@ -24,6 +26,13 @@ abstract class UserstreamPhirehose extends Phirehose {
   public function __construct($username, $password, $method = UserstreamPhirehose::METHOD_USER, $format = self::FORMAT_JSON, $auth_method = UserstreamPhirehose::CONNECT_OAUTH) {
     parent::__construct($username, $password, $method, $format);
     $this->auth_method = $auth_method;
+
+    if( defined("TWITTER_CONSUMER_KEY") ) {
+      $this->consumerKey = TWITTER_CONSUMER_KEY;
+    }
+    if( defined("TWITTER_CONSUMER_SECRET") ) {
+      $this->consumerSecret = TWITTER_CONSUMER_SECRET;
+    }
   }
 
     
@@ -291,29 +300,22 @@ abstract class UserstreamPhirehose extends Phirehose {
   
       // Encode request data
       $postData = http_build_query($requestParams);
+      $postData = (empty($postData)) ? '' : '?'.$postData;
       
       // Oauth tokens
-      $oauthHeader = $this->getOAuthHeader('POST', $url, $requestParams);
+      $oauthHeader = $this->getOAuthHeader('GET', $url, $requestParams);
       
       // Do it
-      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.0\r\n");
+      fwrite($this->conn, "GET " . $urlParts['path'] . $postData . " HTTP/1.1\r\n");
       fwrite($this->conn, "Host: " . $urlParts['host'].':'.$port . "\r\n");
-      fwrite($this->conn, "Content-type: application/x-www-form-urlencoded\r\n");
-      fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
       fwrite($this->conn, 'User-Agent: ' . self::USER_AGENT . "\r\n");
       fwrite($this->conn, $oauthHeader."\r\n");
       fwrite($this->conn, "\r\n");
-      fwrite($this->conn, $postData . "\r\n");
-      fwrite($this->conn, "\r\n");
 
-      $this->log("POST " . $urlParts['path'] . " HTTP/1.0");
+      $this->log("GET " . $urlParts['path'] . " HTTP/1.1");
       $this->log("Host: " . $urlParts['host'].':'.$port);
-      $this->log("Content-type: application/x-www-form-urlencoded");
-      $this->log("Content-length: " . strlen($postData));
       $this->log('User-Agent: ' . self::USER_AGENT);
       $this->log($oauthHeader);
-      $this->log('');
-      $this->log($postData);
       $this->log('');
       
       // First line is response
@@ -385,7 +387,7 @@ abstract class UserstreamPhirehose extends Phirehose {
     }
 
 
-    $oauth['oauth_consumer_key'] = TWITTER_CONSUMER_KEY;
+    $oauth['oauth_consumer_key'] = $this->consumerKey;
     $oauth['oauth_token'] = $this->username;
     $oauth['oauth_nonce'] = md5(uniqid(rand(), true));
     $oauth['oauth_timestamp'] = time();
@@ -476,7 +478,7 @@ abstract class UserstreamPhirehose extends Phirehose {
     $this->log('DEBUG: ' . var_export($signatureBaseString, TRUE));
     
     # sign the signature string
-    $key = $this->encode_rfc3986(TWITTER_CONSUMER_SECRET) . '&' . $this->encode_rfc3986($this->password);
+    $key = $this->encode_rfc3986($this->consumerSecret) . '&' . $this->encode_rfc3986($this->password);
     return base64_encode(hash_hmac('sha1', $signatureBaseString, $key, true));
   }
     
@@ -492,5 +494,5 @@ abstract class UserstreamPhirehose extends Phirehose {
     $oauth = substr($oauth, 0, -2);
     return $oauth;
   }
-        
+
 }
