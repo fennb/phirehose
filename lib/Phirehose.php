@@ -571,7 +571,9 @@ abstract class Phirehose
       $urlParts = parse_url($url);
       
       // Setup params appropriately
-      //$requestParams = array('delimited' => 'length');    //No, we don't want this any more
+      $requestParams=array();
+      
+      //$requestParams['delimited'] = 'length';    //No, we don't want this any more
 
       // Setup the language of the stream
       if($this->lang) {
@@ -651,7 +653,7 @@ abstract class Phirehose
       $postData = str_replace('+','%20',$postData); //Change it from RFC1738 to RFC3986 (see
             //enc_type parameter in http://php.net/http_build_query and note that enc_type is
             //not available as of php 5.3)
-      $authCredentials = $this->getAuthorizationHeader();
+      $authCredentials = $this->getAuthorizationHeader($url,$requestParams);
       
       // Do it
       $s = "POST " . $urlParts['path'] . " HTTP/1.1\r\n";
@@ -736,7 +738,7 @@ abstract class Phirehose
     
   }
 
-	protected function getAuthorizationHeader()
+	protected function getAuthorizationHeader($url,$requestParams)
 	{
 		$authCredentials = base64_encode($this->username . ':' . $this->password);
 		return "Basic: ".$authCredentials;
