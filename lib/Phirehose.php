@@ -450,7 +450,7 @@ abstract class Phirehose
            $this->enqueueStatus(substr($this->buff,0,$eol));
            $this->enqueueSpent += (microtime(TRUE) - $enqueueStart);
            $this->statusCount++;
-           $this->buff = substr($this->buff,$eol);
+           $this->buff = substr($this->buff,$eol+2);    //+2 to allow for the \r\n
         }
 
         //NOTE: if $this->buff is not empty, it is tempting to go round and get the next HTTP chunk, as
@@ -680,8 +680,8 @@ abstract class Phirehose
 
       // Consume each header response line until we get to body
       while ($hLine = trim(fgets($this->conn, 4096))) {
-        $respHeaders .= $hLine;
-        if($hLine=='Transfer-Encoding: chunked')$chunking=true;
+        $respHeaders .= $hLine."\n";
+        if($hLine=='Transfer-Encoding: chunked')$isChunking=true;
       }
       
       // If we got a non-200 response, we need to backoff and retry
@@ -715,9 +715,10 @@ abstract class Phirehose
         continue;
         
       } // End if not http 200
+    else{
+      if(!$isChunking)throw new Exception("Twitter did not send a chunking header. Is this really HTTP/1.1? Here are headers:\n$respHeaders");   //TODO: rather crude!
+      }
 
-      if(!$isChunking)throw new Exception("Twitter did not send a chunking header. Is this really HTTP/1.1");   //TODO: rather crude!
-      
       // Loop until connected OK
     } while (!is_resource($this->conn) || $httpCode != 200);
     
