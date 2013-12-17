@@ -1,10 +1,12 @@
 <?php
-require_once('../lib/UserstreamPhirehose.php');
+require_once('../lib/OauthPhirehose.php');
 
 /**
- * Barebones example of using UserstreamPhirehose.
+ * Barebones example of using OauthPhirehose to do site streams.
+ *
+ * NOTE: Completely UNTESTED.
  */
-class MyUserConsumer extends UserstreamPhirehose 
+class MyUserConsumer extends OauthPhirehose 
 {
   /**
    * First response looks like this:
@@ -52,5 +54,9 @@ define('OAUTH_TOKEN', 'XXXXXXXXXX');
 define('OAUTH_SECRET', 'XXXXXXXXXX');
 
 // Start streaming
-$sc = new MyUserConsumer(OAUTH_TOKEN, OAUTH_SECRET);
+$sc = new MyUserConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_SITE);
+$sc->setFollow(array(
+    1234, 5678, 901234573   //The user IDs of the twitter accounts to follow. All of
+        //these users must have given your app permission.
+    ));
 $sc->consume();

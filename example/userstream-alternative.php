@@ -1,10 +1,14 @@
 <?php
-require_once('../lib/UserstreamPhirehose.php');
+require_once('../lib/OauthPhirehose.php');
 
 /**
- * Barebones example of using UserstreamPhirehose.
+ * Barebones example of using OauthPhirehose to do user streams.
+ *
+ * This shows how to get user streams by just passing Phirehose::METHOD_USER
+ *  as the 3rd parameter to the constructor, instead of using the UserStreamPhirehose
+ *  class.
  */
-class MyUserConsumer extends UserstreamPhirehose 
+class MyUserConsumer extends OauthPhirehose 
 {
   /**
    * First response looks like this:
@@ -52,5 +56,5 @@ define('OAUTH_TOKEN', 'XXXXXXXXXX');
 define('OAUTH_SECRET', 'XXXXXXXXXX');
 
 // Start streaming
-$sc = new MyUserConsumer(OAUTH_TOKEN, OAUTH_SECRET);
+$sc = new MyUserConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_USER);
 $sc->consume();

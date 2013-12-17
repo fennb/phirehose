@@ -14,7 +14,6 @@ abstract class Phirehose
   /**
    * Class constants
    */
-  const URL_BASE         = 'https://stream.twitter.com/1.1/statuses/';
   const FORMAT_JSON      = 'json';
   const FORMAT_XML       = 'xml';
   const METHOD_FILTER    = 'filter';
@@ -22,7 +21,15 @@ abstract class Phirehose
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
   const METHOD_LINKS     = 'links';
+  const METHOD_USER      = 'user';  //See UserstreamPhirehose.php
+  const METHOD_SITE      = 'site';  //See UserstreamPhirehose.php
+
   const EARTH_RADIUS_KM  = 6371;
+
+  /**
+  * @internal Moved from being a const to a variable, because some methods (user and site) need to change it.
+  */
+  protected $URL_BASE         = 'https://stream.twitter.com/1.1/statuses/';
   
   
   /**
@@ -150,15 +157,22 @@ abstract class Phirehose
   
   /**
    * Create a new Phirehose object attached to the appropriate twitter stream method.
-   * Methods are: METHOD_FIREHOSE, METHOD_RETWEET, METHOD_SAMPLE, METHOD_FILTER, METHOD_LINKS
+   * Methods are: METHOD_FIREHOSE, METHOD_RETWEET, METHOD_SAMPLE, METHOD_FILTER, METHOD_LINKS, METHOD_USER, METHOD_SITE. Note: the method might cause the use of a different endpoint URL.
    * Formats are: FORMAT_JSON, FORMAT_XML
    * @see Phirehose::METHOD_SAMPLE
    * @see Phirehose::FORMAT_JSON
    *
-   * @param string $username Any twitter username
-   * @param string $password Any twitter password
+   * @param string $username Any twitter username. When using oAuth, this is the 'oauth_token'.
+   * @param string $password Any twitter password. When using oAuth this is you oAuth secret.
    * @param string $method
    * @param string $format
+  *
+  * @todo I've kept the "/2/" at the end of the URL for user streams, as that is what
+  *    was there before AND it works for me! But the official docs say to use /1.1/
+  *    so that is what I have used for site.
+  *     https://dev.twitter.com/docs/api/1.1/get/user
+  *
+  * @todo Shouldn't really hard-code URL strings in this function.
    */
   public function __construct($username, $password, $method = Phirehose::METHOD_SAMPLE, $format = self::FORMAT_JSON, $lang = FALSE)
   {
@@ -167,6 +181,11 @@ abstract class Phirehose
     $this->method = $method;
     $this->format = $format;
     $this->lang = $lang;
+   switch($method){
+        case self::METHOD_USER:$this->URL_BASE = 'https://userstream.twitter.com/2/';break;
+        case self::METHOD_SITE:$this->URL_BASE = 'https://sitestream.twitter.com/1.1/';break;
+        default:break;  //Stick to the default
+        }
   }
   
   /**
@@ -567,7 +586,7 @@ abstract class Phirehose
       }
       
       // Construct URL/HTTP bits
-      $url = self::URL_BASE . $this->method . '.' . $this->format;
+      $url = $this->URL_BASE . $this->method . '.' . $this->format;
       $urlParts = parse_url($url);
       
       // Setup params appropriately
@@ -584,7 +603,8 @@ abstract class Phirehose
       if ($this->method == self::METHOD_FILTER && count($this->trackWords) > 0) {
         $requestParams['track'] = implode(',', $this->trackWords);
       }
-      if ($this->method == self::METHOD_FILTER && count($this->followIds) > 0) {
+      if ( ($this->method == self::METHOD_FILTER || $this->method == self::METHOD_SITE)
+            && count($this->followIds) > 0) {
         $requestParams['follow'] = implode(',', $this->followIds);
       }
       if ($this->method == self::METHOD_FILTER && count($this->locationBoxes) > 0) {
