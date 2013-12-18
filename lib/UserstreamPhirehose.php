@@ -1,5 +1,5 @@
 <?php
-require_once('../lib/OauthPhirehose.php');
+require_once('OauthPhirehose.php');
 
 /**
 * This class just exists to have a different default method

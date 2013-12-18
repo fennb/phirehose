@@ -1,5 +1,5 @@
 <?php
-require_once('../lib/Phirehose.php');
+require_once('Phirehose.php');
 
 /**
 *
