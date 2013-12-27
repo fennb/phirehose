@@ -11,21 +11,6 @@ See:
   * Encourage well-behaved streaming API clients
   * Operate independently of PHP extensions (ie: shared memory, PCNTL, etc)
 
-In short:
-
-	require_once('Phirehose.php');
-	class MyStream extends Phirehose
-	{
-	  public function enqueueStatus($status)
-	  {
-	    print $status;
-	  }
-	}
-	
-	$stream = new MyStream('username', 'password');
-	$stream->consume();
-
-
 ## What this library does do ##
   * Handles connection/authentication to the twitter streaming API
   * Consumes the stream handing off each status to be enqueued by a method of your choice
@@ -37,6 +22,15 @@ In short:
   * Provide any sort of queueing mechanism for asynchronous processing (though some examples are included)
   * Provide any sort of inter-process communication
   * Provide any non-streaming API functionality (ie: user profile info, search, etc)
+
+## How To Use ##
+
+See the example subdirectory for example usage. In each example file you will need to insert your own oauth token/secret, and the key/secret for the Twitter app you have created.
+
+  * filter-oauth.php shows how to follow certain keywords.
+  * sample.php shows how to get a small random sample of all public statuses.
+  * userstream-alternative.php shows how to get user streams. (All activity for one user.)
+  * sitestream.php shows to how to get site streams. (All activity for multiple users.)
 
 Please see the wiki for [documentation](https://github.com/fennb/phirehose/wiki/Introduction).
 
