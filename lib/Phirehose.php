@@ -6,7 +6,7 @@
  *  - http://code.google.com/p/phirehose/wiki/Introduction
  *  - http://dev.twitter.com/pages/streaming_api
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
- * @version 0.2.gitmaster
+ * @version 1.0RC
  */
 abstract class Phirehose
 {
@@ -14,7 +14,6 @@ abstract class Phirehose
   /**
    * Class constants
    */
-  const URL_BASE         = 'https://stream.twitter.com/1.1/statuses/';
   const FORMAT_JSON      = 'json';
   const FORMAT_XML       = 'xml';
   const METHOD_FILTER    = 'filter';
@@ -22,7 +21,15 @@ abstract class Phirehose
   const METHOD_RETWEET   = 'retweet';
   const METHOD_FIREHOSE  = 'firehose';
   const METHOD_LINKS     = 'links';
+  const METHOD_USER      = 'user';  //See UserstreamPhirehose.php
+  const METHOD_SITE      = 'site';  //See UserstreamPhirehose.php
+
   const EARTH_RADIUS_KM  = 6371;
+
+  /**
+  * @internal Moved from being a const to a variable, because some methods (user and site) need to change it.
+  */
+  protected $URL_BASE         = 'https://stream.twitter.com/1.1/statuses/';
   
   
   /**
@@ -140,7 +147,7 @@ abstract class Phirehose
   protected $idleReconnectTimeout = 90;
   protected $avgPeriod = 60;
   protected $status_length_base = 10;
-  protected $userAgent       = 'Phirehose/0.2.gitmaster +https://github.com/fennb/phirehose';
+  protected $userAgent       = 'Phirehose/1.0RC +https://github.com/fennb/phirehose';
   protected $filterCheckMin = 5;
   protected $filterUpdMin   = 120;
   protected $tcpBackoff      = 1;
@@ -150,15 +157,22 @@ abstract class Phirehose
   
   /**
    * Create a new Phirehose object attached to the appropriate twitter stream method.
-   * Methods are: METHOD_FIREHOSE, METHOD_RETWEET, METHOD_SAMPLE, METHOD_FILTER, METHOD_LINKS
+   * Methods are: METHOD_FIREHOSE, METHOD_RETWEET, METHOD_SAMPLE, METHOD_FILTER, METHOD_LINKS, METHOD_USER, METHOD_SITE. Note: the method might cause the use of a different endpoint URL.
    * Formats are: FORMAT_JSON, FORMAT_XML
    * @see Phirehose::METHOD_SAMPLE
    * @see Phirehose::FORMAT_JSON
    *
-   * @param string $username Any twitter username
-   * @param string $password Any twitter password
+   * @param string $username Any twitter username. When using oAuth, this is the 'oauth_token'.
+   * @param string $password Any twitter password. When using oAuth this is you oAuth secret.
    * @param string $method
    * @param string $format
+  *
+  * @todo I've kept the "/2/" at the end of the URL for user streams, as that is what
+  *    was there before AND it works for me! But the official docs say to use /1.1/
+  *    so that is what I have used for site.
+  *     https://dev.twitter.com/docs/api/1.1/get/user
+  *
+  * @todo Shouldn't really hard-code URL strings in this function.
    */
   public function __construct($username, $password, $method = Phirehose::METHOD_SAMPLE, $format = self::FORMAT_JSON, $lang = FALSE)
   {
@@ -167,6 +181,11 @@ abstract class Phirehose
     $this->method = $method;
     $this->format = $format;
     $this->lang = $lang;
+   switch($method){
+        case self::METHOD_USER:$this->URL_BASE = 'https://userstream.twitter.com/2/';break;
+        case self::METHOD_SITE:$this->URL_BASE = 'https://sitestream.twitter.com/1.1/';break;
+        default:break;  //Stick to the default
+        }
   }
   
   /**
@@ -370,6 +389,10 @@ abstract class Phirehose
    * Connects to the stream API and consumes the stream. Each status update in the stream will cause a call to the
    * handleStatus() method.
    *
+   * Note: in normal use this function does not return.
+   * If you pass $reconnect as false, it will still not return in normal use: it will only return
+   *   if the remote side (Twitter) close the socket. (Or the socket dies for some other external reason.)
+   *
    * @see handleStatus()
    * @param boolean $reconnect Reconnects as per recommended
    * @throws ErrorException
@@ -390,7 +413,13 @@ abstract class Phirehose
       $fdw = $fde = NULL; // Placeholder write/error file descriptors for stream_select
       
       // We use a blocking-select with timeout, to allow us to continue processing on idle streams
-      while ($this->conn !== NULL && !feof($this->conn) && ($numChanged = stream_select($this->fdrPool, $fdw, $fde, $this->readTimeout)) !== FALSE) {
+      //TODO: there is a bug lurking here. If $this->conn is fine, but $numChanged returns zero, because readTimeout was
+      //    reached, then we should consider we still need to call statusUpdate() every 60 seconds, etc.
+      //     ($this->readTimeout is 5 seconds.) This can be quite annoying. E.g. Been getting data regularly for 55 seconds,
+      //     then it goes quiet for just 10 or so seconds. It is now 65 seconds since last call to statusUpdate() has been
+      //     called, which might mean a monitoring system kills the script assuming it has died.
+      while ($this->conn !== NULL && !feof($this->conn) &&
+        ($numChanged = stream_select($this->fdrPool, $fdw, $fde, $this->readTimeout)) !== FALSE) {
         /* Unfortunately, we need to do a safety check for dead twitter streams - This seems to be able to happen where
          * you end up with a valid connection, but NO tweets coming along the wire (or keep alives). The below guards
          * against this.
@@ -404,48 +433,59 @@ abstract class Phirehose
         }
         // Process stream/buffer
         $this->fdrPool = array($this->conn); // Must reassign for stream_select()
-        $this->buff .= fread($this->conn, 6); // Small non-blocking to get delimiter text
-        if (($eol = strpos($this->buff, "\r\n")) === FALSE) {
-          continue; // We need a newline
-        }
+
+        //Get a full HTTP chunk.
+        //NB. This is a tight loop, not using stream_select.
+        //NB. If that causes problems, then perhaps put something to give up after say trying for 10 seconds? (but
+        //   the stream will be all messed up, so will need to do a reconnect).
+        $chunk_info=trim(fgets($this->conn)); //First line is hex digits giving us the length
+        if($chunk_info=='')continue;    //Usually indicates a time-out. If we wanted to be sure,
+          //then stream_get_meta_data($this->conn)['timed_out']==1.  (We could instead
+          //   look at the 'eof' member, which appears to be boolean false if just a time-out.)
+          //TODO: need to consider calling statusUpdate() every 60 seconds, etc.
+
         // Track maximum idle period
+        // (We got start of an HTTP chunk, this is stream activity)
         $this->idlePeriod = (time() - $lastStreamActivity);
         $this->maxIdlePeriod = ($this->idlePeriod > $this->maxIdlePeriod) ? $this->idlePeriod : $this->maxIdlePeriod;
-        // We got a newline, this is stream activity
         $lastStreamActivity = time();
-        // Read status length delimiter
-        $delimiter = substr($this->buff, 0, $eol);
-        $this->buff = substr($this->buff, $eol + 2); // consume off buffer, + 2 = "\r\n"
-        $statusLength = intval($delimiter, $this->status_length_base);
-        if ($statusLength > 0) {
-          // Read status bytes and enqueue
-          $bytesLeft = $statusLength - strlen($this->buff);
-          while ( $bytesLeft > 0 
-                  && $this->conn !== NULL 
-                  && !feof($this->conn) 
-                  && ($numChanged = stream_select($this->fdrPool, $fdw, $fde, 0, 20000)) !== FALSE 
-                  && (time() - $lastStreamActivity) <= $this->idleReconnectTimeout) {  
-            $this->fdrPool = array($this->conn); // Reassign
-            $this->buff .= fread($this->conn, $bytesLeft); // Read until all bytes are read into buffer
-            $bytesLeft = ($statusLength - strlen($this->buff));
-          }
-          // Accrue/enqueue and track time spent enqueing
-          $enqueueStart = microtime(TRUE);
-          $this->enqueueStatus($this->buff);
-          $this->enqueueSpent += (microtime(TRUE) - $enqueueStart);
-          $this->statusCount++;
-        } else {
-          // Timeout/no data after readTimeout seconds
-          
+
+        //Append one HTTP chunk to $this->buff
+        $len=hexdec($chunk_info);   //$len includes the \r\n at the end of the chunk (despite what wikipedia says)
+        //TODO: could do a check for data corruption here. E.g. if($len>100000){...}
+        $s='';
+        $len+=2;    //For the \r\n at the end of the chunk
+        while(!feof($this->conn)){
+           $s.=fread($this->conn,$len-strlen($s));
+           if(strlen($s)>=$len)break;  //TODO: Can never be >$len, only ==$len??
+           }
+        $this->buff.=substr($s,0,-2);   //This is our HTTP chunk
+
+        //Process each full tweet inside $this->buff
+        while(1){
+           $eol = strpos($this->buff,"\r\n");  //Find next line ending
+           if($eol===false)break;   //Time to get more data
+           $enqueueStart = microtime(TRUE);
+           $this->enqueueStatus(substr($this->buff,0,$eol));
+           $this->enqueueSpent += (microtime(TRUE) - $enqueueStart);
+           $this->statusCount++;
+           $this->buff = substr($this->buff,$eol+2);    //+2 to allow for the \r\n
         }
+
+        //NOTE: if $this->buff is not empty, it is tempting to go round and get the next HTTP chunk, as
+        //  we know there is data on the incoming stream. However, this could mean the below functions (heartbeat
+        //  and statusUpdate) *never* get called, which would be bad.
+
         // Calc counter averages
         $this->avgElapsed = time() - $lastAverage;
         if ($this->avgElapsed >= $this->avgPeriod) {
           $this->statusRate = round($this->statusCount / $this->avgElapsed, 0);          // Calc tweets-per-second
           // Calc time spent per enqueue in ms
-          $this->enqueueTimeMS = ($this->statusCount > 0) ? round($this->enqueueSpent / $this->statusCount * 1000, 2) : 0;
+          $this->enqueueTimeMS = ($this->statusCount > 0) ?
+            round($this->enqueueSpent / $this->statusCount * 1000, 2) : 0;
           // Calc time spent total in filter predicate checking
-          $this->filterCheckTimeMS = ($this->filterCheckCount > 0) ? round($this->filterCheckSpent / $this->filterCheckCount * 1000, 2) : 0;
+          $this->filterCheckTimeMS = ($this->filterCheckCount > 0) ?
+            round($this->filterCheckSpent / $this->filterCheckCount * 1000, 2) : 0;
 
           $this->heartbeat();
           $this->statusUpdate();
@@ -546,11 +586,13 @@ abstract class Phirehose
       }
       
       // Construct URL/HTTP bits
-      $url = self::URL_BASE . $this->method . '.' . $this->format;
+      $url = $this->URL_BASE . $this->method . '.' . $this->format;
       $urlParts = parse_url($url);
       
       // Setup params appropriately
-      $requestParams = array('delimited' => 'length');
+      $requestParams=array();
+      
+      //$requestParams['delimited'] = 'length';    //No, we don't want this any more
 
       // Setup the language of the stream
       if($this->lang) {
@@ -561,7 +603,8 @@ abstract class Phirehose
       if ($this->method == self::METHOD_FILTER && count($this->trackWords) > 0) {
         $requestParams['track'] = implode(',', $this->trackWords);
       }
-      if ($this->method == self::METHOD_FILTER && count($this->followIds) > 0) {
+      if ( ($this->method == self::METHOD_FILTER || $this->method == self::METHOD_SITE)
+            && count($this->followIds) > 0) {
         $requestParams['follow'] = implode(',', $this->followIds);
       }
       if ($this->method == self::METHOD_FILTER && count($this->locationBoxes) > 0) {
@@ -630,40 +673,35 @@ abstract class Phirehose
       $postData = str_replace('+','%20',$postData); //Change it from RFC1738 to RFC3986 (see
             //enc_type parameter in http://php.net/http_build_query and note that enc_type is
             //not available as of php 5.3)
-      $authCredentials = $this->getAuthorizationHeader();
+      $authCredentials = $this->getAuthorizationHeader($url,$requestParams);
       
       // Do it
-      fwrite($this->conn, "POST " . $urlParts['path'] . " HTTP/1.0\r\n");
-      fwrite($this->conn, "Host: " . $urlParts['host'] . ':' . $port . "\r\n");
-      fwrite($this->conn, "Content-type: application/x-www-form-urlencoded\r\n");
-      fwrite($this->conn, "Content-length: " . strlen($postData) . "\r\n");
-      fwrite($this->conn, "Accept: */*\r\n");
-      fwrite($this->conn, 'Authorization: ' . $authCredentials . "\r\n");
-      fwrite($this->conn, 'User-Agent: ' . $this->userAgent . "\r\n");
-      fwrite($this->conn, "\r\n");
-      fwrite($this->conn, $postData . "\r\n");
-      fwrite($this->conn, "\r\n");
+      $s = "POST " . $urlParts['path'] . " HTTP/1.1\r\n";
+      $s.= "Host: " . $urlParts['host'] . ':' . $port . "\r\n";
+      $s .= "Connection: Close\r\n";
+      $s.= "Content-type: application/x-www-form-urlencoded\r\n";
+      $s.= "Content-length: " . strlen($postData) . "\r\n";
+      $s.= "Accept: */*\r\n";
+      $s.= 'Authorization: ' . $authCredentials . "\r\n";
+      $s.= 'User-Agent: ' . $this->userAgent . "\r\n";
+      $s.= "\r\n";
+      $s.= $postData . "\r\n";
+      $s.= "\r\n";
       
-      $this->log("POST " . $urlParts['path'] . " HTTP/1.0\r\n");
-      $this->log("Host: " . $urlParts['host'] . ':' . $port . "\r\n");
-      $this->log("Content-type: application/x-www-form-urlencoded\r\n");
-      $this->log("Content-length: " . strlen($postData) . "\r\n");
-      $this->log("Accept: */*\r\n");
-      $this->log('Authorization: ' . $authCredentials . "\r\n");
-      $this->log('User-Agent: ' . $this->userAgent . "\r\n");
-      $this->log("\r\n");
-      $this->log($postData . "\r\n");
-      $this->log("\r\n");
+      fwrite($this->conn, $s);
+      $this->log($s);
       
       // First line is response
       list($httpVer, $httpCode, $httpMessage) = preg_split('/\s+/', trim(fgets($this->conn, 1024)), 3);
       
       // Response buffers
       $respHeaders = $respBody = '';
+      $isChunking = false;
 
       // Consume each header response line until we get to body
       while ($hLine = trim(fgets($this->conn, 4096))) {
-        $respHeaders .= $hLine;
+        $respHeaders .= $hLine."\n";
+        if($hLine=='Transfer-Encoding: chunked')$isChunking=true;
       }
       
       // If we got a non-200 response, we need to backoff and retry
@@ -671,6 +709,7 @@ abstract class Phirehose
         $connectFailures++;
         
         // Twitter will disconnect on error, but we want to consume the rest of the response body (which is useful)
+        //TODO: this might be chunked too? In which case this contains some bad characters??
         while ($bLine = trim(fgets($this->conn, 4096))) {
           $respBody .= $bLine;
         }
@@ -696,7 +735,10 @@ abstract class Phirehose
         continue;
         
       } // End if not http 200
-      
+    else{
+      if(!$isChunking)throw new Exception("Twitter did not send a chunking header. Is this really HTTP/1.1? Here are headers:\n$respHeaders");   //TODO: rather crude!
+      }
+
       // Loop until connected OK
     } while (!is_resource($this->conn) || $httpCode != 200);
     
@@ -717,8 +759,9 @@ abstract class Phirehose
     
   }
 
-	protected function getAuthorizationHeader()
+	protected function getAuthorizationHeader($url,$requestParams)
 	{
+        throw new Exception("Basic auth no longer works with Twitter. You must derive from OauthPhirehose, not directly from the Phirehose class.");
 		$authCredentials = base64_encode($this->username . ':' . $this->password);
 		return "Basic: ".$authCredentials;
 	}
