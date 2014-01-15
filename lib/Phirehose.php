@@ -464,6 +464,10 @@ abstract class Phirehose
         //Process each full tweet inside $this->buff
         while(1){
            $eol = strpos($this->buff,"\r\n");  //Find next line ending
+           if($eol===0) {  // if 0, then buffer starts with "\r\n", so trim it and loop again
+             $this->buff = substr($this->buff,$eol+2);  // remove the "\r\n" from line start
+             continue; // loop again
+           }
            if($eol===false)break;   //Time to get more data
            $enqueueStart = microtime(TRUE);
            $this->enqueueStatus(substr($this->buff,0,$eol));
