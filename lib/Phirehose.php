@@ -154,6 +154,8 @@ abstract class Phirehose
   protected $tcpBackoffMax  = 16;
   protected $httpBackoff  = 10;
   protected $httpBackoffMax  = 240;
+  protected $hostPort = 80;
+  protected $secureHostPort = 443;
   
   /**
    * Create a new Phirehose object attached to the appropriate twitter stream method.
@@ -848,6 +850,28 @@ abstract class Phirehose
    * @return NULL
    */
   public function heartbeat() {}
+  
+  /**
+   * Set host port
+   *
+   * @param string $host
+   * @return void
+   */
+  public function setHostPort($port)
+  {
+    $this->hostPort = $port;
+  }
+ 
+  /**
+   * Set secure host port
+   *
+   * @param int $port
+   * @return void
+   */
+  public function setSecureHostPort($port)
+  {
+    $this->secureHostPort = $port;
+  }
 
 } // End of class
 
