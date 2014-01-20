@@ -630,7 +630,7 @@ abstract class Phirehose
        */
       $errNo = $errStr = NULL;
       $scheme = ($urlParts['scheme'] == 'https') ? 'ssl://' : 'tcp://';
-      $port = ($urlParts['scheme'] == 'https') ? 443 : 80;
+      $port = ($urlParts['scheme'] == 'https') ? $this->secureHostPort : $this->hostPort;
       
       /**
        * We must perform manual host resolution here as Twitter's IP regularly rotates (ie: DNS TTL of 60 seconds) and
