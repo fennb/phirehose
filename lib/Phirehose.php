@@ -154,6 +154,8 @@ abstract class Phirehose
   protected $tcpBackoffMax  = 16;
   protected $httpBackoff  = 10;
   protected $httpBackoffMax  = 240;
+  protected $hostPort = 80;
+  protected $secureHostPort = 443;
   
   /**
    * Create a new Phirehose object attached to the appropriate twitter stream method.
@@ -628,7 +630,7 @@ abstract class Phirehose
        */
       $errNo = $errStr = NULL;
       $scheme = ($urlParts['scheme'] == 'https') ? 'ssl://' : 'tcp://';
-      $port = ($urlParts['scheme'] == 'https') ? 443 : 80;
+      $port = ($urlParts['scheme'] == 'https') ? $this->secureHostPort : $this->hostPort;
       
       /**
        * We must perform manual host resolution here as Twitter's IP regularly rotates (ie: DNS TTL of 60 seconds) and
@@ -848,6 +850,28 @@ abstract class Phirehose
    * @return NULL
    */
   public function heartbeat() {}
+  
+  /**
+   * Set host port
+   *
+   * @param string $host
+   * @return void
+   */
+  public function setHostPort($port)
+  {
+    $this->hostPort = $port;
+  }
+ 
+  /**
+   * Set secure host port
+   *
+   * @param int $port
+   * @return void
+   */
+  public function setSecureHostPort($port)
+  {
+    $this->secureHostPort = $port;
+  }
 
 } // End of class
 
