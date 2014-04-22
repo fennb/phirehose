@@ -707,7 +707,7 @@ abstract class Phirehose
       // Consume each header response line until we get to body
       while ($hLine = trim(fgets($this->conn, 4096))) {
         $respHeaders .= $hLine."\n";
-        if($hLine=='Transfer-Encoding: chunked')$isChunking=true;
+        if(strtolower($hLine) == 'transfer-encoding: chunked') $isChunking = true;
       }
       
       // If we got a non-200 response, we need to backoff and retry
