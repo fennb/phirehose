@@ -3,7 +3,7 @@ A PHP interface to the Twitter Streaming API (firehose, etc). This library makes
 
 See:
   * https://github.com/fennb/phirehose/wiki/Introduction and 
-  * http://dev.twitter.com/pages/streaming_api
+  * https://dev.twitter.com/streaming/overview
 
 ## Goals ##
   * Provide a simple interface to the Twitter Streaming API for PHP applications
