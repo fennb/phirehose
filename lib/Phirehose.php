@@ -632,21 +632,9 @@ abstract class Phirehose
       $scheme = ($urlParts['scheme'] == 'https') ? 'ssl://' : 'tcp://';
       $port = ($urlParts['scheme'] == 'https') ? $this->secureHostPort : $this->hostPort;
       
-      /**
-       * We must perform manual host resolution here as Twitter's IP regularly rotates (ie: DNS TTL of 60 seconds) and
-       * PHP appears to cache it the result if in a long running process (as per Phirehose).
-       */
-      $streamIPs = gethostbynamel($urlParts['host']);
-      if(empty($streamIPs)) {
-        throw new PhirehoseNetworkException("Unable to resolve hostname: '" . $urlParts['host'] . '"');
-      }
+      $this->log("Connecting to {$scheme}{$urlParts['host']}, port={$port}, connectTimeout={$this->connectTimeout}");
       
-      // Choose one randomly (if more than one)
-      $this->log('Resolved host ' . $urlParts['host'] . ' to ' . implode(', ', $streamIPs));
-      $streamIP = $streamIPs[rand(0, (count($streamIPs) - 1))];
-      $this->log("Connecting to {$scheme}{$streamIP}, port={$port}, connectTimeout={$this->connectTimeout}");
-      
-      @$this->conn = fsockopen($scheme . $streamIP, $port, $errNo, $errStr, $this->connectTimeout);
+      @$this->conn = fsockopen($scheme . $urlParts['host'], $port, $errNo, $errStr, $this->connectTimeout);
   
       // No go - handle errors/backoff
       if (!$this->conn || !is_resource($this->conn)) {
@@ -667,7 +655,7 @@ abstract class Phirehose
       }
       
       // TCP connect OK, clear last error (if present)
-      $this->log('Connection established to ' . $streamIP);
+      $this->log('Connection established to ' . $urlParts['host']);
       $this->lastErrorMsg = NULL;
       $this->lastErrorNo = NULL;
       
