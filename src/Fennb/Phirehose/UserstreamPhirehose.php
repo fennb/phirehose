@@ -1,5 +1,6 @@
 <?php
-require_once('OauthPhirehose.php');
+
+namespace Fennb\Phirehose;
 
 /**
 * This class just exists to have a different default method
