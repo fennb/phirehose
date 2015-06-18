@@ -1,6 +1,6 @@
 <?php
-require_once('Phirehose.php');
 
+namespace Fennb\Phirehose;
 /**
 *
 *
@@ -16,19 +16,22 @@ abstract class OauthPhirehose extends Phirehose
     * The Twitter consumer key. Get it from the application's page on Twitter.
     * If not set then the global define TWITTER_CONSUMER_KEY is used instead.
     */
-    public $consumerKey=null;
+    public $consumerKey = null;
 
     /**
     * The Twitter consumer secret. Get it from the application's page on Twitter.
     * If not set then the global define TWITTER_CONSUMER_SECRET is used instead.
     */
-    public $consumerSecret=null;
+    public $consumerSecret = null;
 
 
     /**
-    */
-	protected function prepareParameters($method = null, $url = null,
-		array $params)
+     * @param null $method
+     * @param null $url
+     * @param array $params
+     * @return array
+     */
+	protected function prepareParameters($method = null, $url = null, array $params)
 	{
 		if (empty($method) || empty($url))
 			return false;
@@ -130,8 +133,7 @@ abstract class OauthPhirehose extends Phirehose
 		$params = $this->prepareParameters($method, $url, $params);
 		$oauthHeaders = $params['oauth'];
 
-		$urlParts = parse_url($url);
-		$oauth = 'OAuth realm="",';
+        $oauth = 'OAuth realm="",';
 		foreach ($oauthHeaders as $name => $value)
 		{
 			$oauth .= "{$name}=\"{$value}\",";
@@ -141,7 +143,11 @@ abstract class OauthPhirehose extends Phirehose
 		return $oauth;
 	}
 
-    /** Overrides base class function */
+    /** Overrides base class function
+     * @param $url
+     * @param $requestParams
+     * @return string
+     */
 	protected function getAuthorizationHeader($url,$requestParams)
 	{
 		return $this->getOAuthHeader('POST', $url, $requestParams);
