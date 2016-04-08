@@ -36,7 +36,7 @@ Please see the wiki for [documentation](https://github.com/fennb/phirehose/wiki/
 
 ## Known Issues
 
-  * After upgrading to PHP 5.6.8, Phirehose causes CPU spikes. To fix, upgrade to PHP 5.6.9 (#83).
+  * After upgrading to PHP 5.6.8, Phirehose causes CPU spikes. To fix, upgrade to PHP 5.6.9 ([#83](https://github.com/fennb/phirehose/issues/83)).
 
 ## Support
 
