@@ -184,7 +184,7 @@ abstract class Phirehose
     $this->format = $format;
     $this->lang = $lang;
    switch($method){
-        case self::METHOD_USER:$this->URL_BASE = 'https://userstream.twitter.com/2/';break;
+        case self::METHOD_USER:$this->URL_BASE = 'https://userstream.twitter.com/1.1/';break;
         case self::METHOD_SITE:$this->URL_BASE = 'https://sitestream.twitter.com/1.1/';break;
         default:break;  //Stick to the default
         }
