@@ -25,12 +25,12 @@ abstract class Phirehose
     const METHOD_SITE = 'site';  //See UserstreamPhirehose.php
 
     const EARTH_RADIUS_KM = 6371;
-
+    const TRACK_OP_AND = 'AND';
+    const TRACK_OP_OR = 'OR';
     /**
      * @internal Moved from being a const to a variable, because some methods (user and site) need to change it.
      */
     protected $URL_BASE = 'https://stream.twitter.com/1.1/statuses/';
-
     /**
      * Member Attribs
      */
@@ -38,9 +38,17 @@ abstract class Phirehose
     protected $password;
     protected $method;
     protected $format;
-    protected $count; //Can be -150,000 to 150,000. @see http://dev.twitter.com/pages/streaming_api_methods#count
+    protected $count; // Can be -150,000 to 150,000. @see http://dev.twitter.com/pages/streaming_api_methods#count
     protected $followIds;
+
     protected $trackWords;
+    // logical operators for building up a phrase
+    protected $trackOperators = [
+        self::TRACK_OP_AND => ' ',
+        self::TRACK_OP_OR => ',',
+    ];
+    protected $trackOperator = self::TRACK_OP_OR;
+
     protected $locationBoxes;
     protected $conn;
     protected $fdrPool;
@@ -238,8 +246,9 @@ abstract class Phirehose
      * See: http://apiwiki.twitter.com/Streaming-API-Documentation#TrackLimiting
      *
      * @param array $trackWords
+     * @param string $operator OR|AND - how words will be joined
      */
-    public function setTrack(array $trackWords)
+    public function setTrack(array $trackWords, $operator = self::TRACK_OP_OR)
     {
         $trackWords = ($trackWords === null) ? [] : $trackWords;
         sort($trackWords); // Non-optimal, but necessary
@@ -247,6 +256,10 @@ abstract class Phirehose
             $this->filterChanged = true;
         }
         $this->trackWords = $trackWords;
+
+        if (isset($this->trackOperators[$operator])) {
+            $this->trackOperator = $this->trackOperators[$operator];
+        }
     }
 
     /**
@@ -649,7 +662,7 @@ abstract class Phirehose
                     $this->trackWords
                 ) > 0
             ) {
-                $requestParams['track'] = implode(',', $this->trackWords);
+                $requestParams['track'] = implode($this->trackOperator, $this->trackWords);
             }
             if (($this->method == self::METHOD_FILTER || $this->method == self::METHOD_SITE)
                 && count($this->followIds) > 0
