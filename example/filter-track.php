@@ -29,5 +29,5 @@ class FilterTrackConsumer extends OauthPhirehose
 
 // Start streaming
 $sc = new FilterTrackConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_FILTER);
-$sc->setTrack(['berlin', 'attack']);
+$sc->setTrack(array('morning', 'goodnight', 'hello', 'the'));
 $sc->consume();
