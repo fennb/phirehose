@@ -1,5 +1,6 @@
 <?php
 require_once('../lib/OauthPhirehose.php');
+require_once 'twitter-auth-config.php';
 
 /**
  * Barebones example of using OauthPhirehose to do user streams.
@@ -8,7 +9,7 @@ require_once('../lib/OauthPhirehose.php');
  *  as the 3rd parameter to the constructor, instead of using the UserStreamPhirehose
  *  class.
  */
-class MyUserConsumer extends OauthPhirehose 
+class MyUserConsumer extends OauthPhirehose
 {
   /**
    * First response looks like this:
@@ -35,25 +36,13 @@ class MyUserConsumer extends OauthPhirehose
     /*
      * In this simple example, we will just display to STDOUT rather than enqueue.
      * NOTE: You should NOT be processing tweets at this point in a real application, instead they
-     *  should be being enqueued and processed asyncronously from the collection process. 
+     *  should be being enqueued and processed asyncronously from the collection process.
      */
     $data = json_decode($status, true);
     echo date("Y-m-d H:i:s (").strlen($status)."):".print_r($data,true)."\n";
   }
 
 }
-
-//These are the application key and secret
-//You can create an application, and then get this info, from https://dev.twitter.com/apps
-//(They are under OAuth Settings, called "Consumer key" and "Consumer secret")
-define('TWITTER_CONSUMER_KEY', 'XXXXXXXXXX');
-define('TWITTER_CONSUMER_SECRET', 'XXXXXXXXXX');
-
-//These are the user's token and secret
-//You can get this from https://dev.twitter.com/apps, under the "Your access token"
-//section for your app.
-define('OAUTH_TOKEN', 'XXXXXXXXXX');
-define('OAUTH_SECRET', 'XXXXXXXXXX');
 
 // Start streaming
 $sc = new MyUserConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_USER);

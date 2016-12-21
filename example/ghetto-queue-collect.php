@@ -1,6 +1,7 @@
 <?php
 require_once('../lib/Phirehose.php');
 require_once('../lib/OauthPhirehose.php');
+require_once 'twitter-auth-config.php';
 
 /**
  * Example of using Phirehose to collect tweets to a "ghetto queue" (ie: simple, filesystem based queue).
@@ -141,15 +142,6 @@ class GhettoQueueCollector extends OauthPhirehose
   }
 
 } // End of class
-
-// The OAuth credentials you received when registering your app at Twitter
-define("TWITTER_CONSUMER_KEY", "");
-define("TWITTER_CONSUMER_SECRET", "");
-
-
-// The OAuth data for the twitter account
-define("OAUTH_TOKEN", "");
-define("OAUTH_SECRET", "");
 
 // Start streaming/collecting
 $sc = new GhettoQueueCollector(OAUTH_TOKEN, OAUTH_SECRET);

@@ -1,6 +1,7 @@
 <?php
 require_once('../lib/Phirehose.php');
 require_once('../lib/OauthPhirehose.php');
+require_once 'twitter-auth-config.php';
 
 /**
  * Example of using Phirehose to display a live filtered stream using geo locations
@@ -25,15 +26,6 @@ class FilterTrackConsumer extends OauthPhirehose
     }
   }
 }
-
-// The OAuth credentials you received when registering your app at Twitter
-define("TWITTER_CONSUMER_KEY", "");
-define("TWITTER_CONSUMER_SECRET", "");
-
-
-// The OAuth data for the twitter account
-define("OAUTH_TOKEN", "");
-define("OAUTH_SECRET", "");
 
 // Start streaming
 $sc = new FilterTrackConsumer(OAUTH_TOKEN, OAUTH_SECRET, Phirehose::METHOD_FILTER);
