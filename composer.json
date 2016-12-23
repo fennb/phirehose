@@ -1,20 +1,26 @@
 {
-    "name": "fennb/phirehose",
-    "description": "A PHP interface to the Twitter Streaming API.",
-    "keywords": ["phirehose", "php", "twitter", "streaming", "api"],
-    "type": "library",
-    "homepage": "https://github.com/fennb/phirehose",
-    "license": "GPL",
-    "authors": [
-        {
-            "name": "Fenn Bailey",
-            "homepage": "http://fennb.com/"
-        }
-    ],
-    "require": {
-        "php": ">=5.4.0"
+  "name": "fennb/phirehose",
+  "description": "A PHP interface to the Twitter Streaming API.",
+  "keywords": [
+    "phirehose",
+    "php",
+    "twitter",
+    "streaming",
+    "api"
+  ],
+  "type": "library",
+  "homepage": "https://github.com/fennb/phirehose",
+  "license": "GPL",
+  "require": {
+    "php": ">=5.4.0",
+    "kreait/firebase-php": "^2.0"
+  },
+  "autoload": {
+    "psr-0": {
+      "MyApp": "src"
     },
-    "autoload": {
-        "classmap": ["lib"]
-    }
+    "classmap": [
+      "lib"
+    ]
+  }
 }
