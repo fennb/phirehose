@@ -606,14 +606,14 @@ abstract class Phirehose
       }
       
       // Filter takes additional parameters
-      if (($this->method == self::METHOD_FILTER || $this->method == self::METHOD_USER) && count($this->trackWords) > 0) {
+      if (($this->method == self::METHOD_FILTER || $this->method == self::METHOD_USER) && !empty($this->trackWords)) {
         $requestParams['track'] = implode(',', $this->trackWords);
       }
       if ( ($this->method == self::METHOD_FILTER || $this->method == self::METHOD_SITE)
-            && count($this->followIds) > 0) {
+            && !empty($this->followIds)) {
         $requestParams['follow'] = implode(',', $this->followIds);
       }
-      if ($this->method == self::METHOD_FILTER && count($this->locationBoxes) > 0) {
+      if ($this->method == self::METHOD_FILTER && !empty($this->locationBoxes)) {
         $requestParams['locations'] = implode(',', $this->locationBoxes);
       }
       if ($this->count <> 0) {
