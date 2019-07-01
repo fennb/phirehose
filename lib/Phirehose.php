@@ -4,7 +4,7 @@
  *
  * Note: This is beta software - Please read the following carefully before using:
  *  - https://github.com/fennb/phirehose
- *  - http://dev.twitter.com/pages/streaming_api
+ *  - https://developer.twitter.com/en/docs/tweets/filter-realtime/overview
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
  * @version 1.0RC
  */
