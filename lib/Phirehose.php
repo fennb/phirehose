@@ -3,7 +3,7 @@
  * A class that makes it easy to connect to and consume the Twitter stream via the Streaming API.
  *
  * Note: This is beta software - Please read the following carefully before using:
- *  - https://github.com/fennb/phirehose
+ *  - https://github.com/fennb/phirehose/wiki/Introduction
  *  - https://developer.twitter.com/en/docs/tweets/filter-realtime/overview
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
  * @version 1.0RC
