@@ -2,3 +2,5 @@
 *.un~
 .cache
 .cache/*
+composer.lock
+vendor/
