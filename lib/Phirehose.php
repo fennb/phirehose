@@ -3,8 +3,8 @@
  * A class that makes it easy to connect to and consume the Twitter stream via the Streaming API.
  *
  * Note: This is beta software - Please read the following carefully before using:
- *  - http://code.google.com/p/phirehose/wiki/Introduction
- *  - http://dev.twitter.com/pages/streaming_api
+ *  - https://github.com/fennb/phirehose/wiki/Introduction
+ *  - https://developer.twitter.com/en/docs/tweets/filter-realtime/overview
  * @author  Fenn Bailey <fenn.bailey@gmail.com>
  * @version 1.0RC
  */
@@ -29,8 +29,10 @@ abstract class Phirehose
   /**
   * @internal Moved from being a const to a variable, because some methods (user and site) need to change it.
   */
-  protected $URL_BASE         = 'https://stream.twitter.com/1.1/statuses/';
-  
+  protected $URL_BASE               = 'https://stream.twitter.com/1.1/statuses/';
+  protected $USER_METHOD_URL_BASE   = 'https://userstream.twitter.com/1.1/';
+  protected $SITE_METHOD_URL_BASE   = 'https://sitestream.twitter.com/1.1/';
+
   
   /**
    * Member Attribs
@@ -174,7 +176,6 @@ abstract class Phirehose
   *    so that is what I have used for site.
   *     https://dev.twitter.com/docs/api/1.1/get/user
   *
-  * @todo Shouldn't really hard-code URL strings in this function.
    */
   public function __construct($username, $password, $method = Phirehose::METHOD_SAMPLE, $format = self::FORMAT_JSON, $lang = FALSE)
   {
@@ -183,11 +184,17 @@ abstract class Phirehose
     $this->method = $method;
     $this->format = $format;
     $this->lang = $lang;
-   switch($method){
-        case self::METHOD_USER:$this->URL_BASE = 'https://userstream.twitter.com/1.1/';break;
-        case self::METHOD_SITE:$this->URL_BASE = 'https://sitestream.twitter.com/1.1/';break;
-        default:break;  //Stick to the default
-        }
+
+    switch($method){
+        case self::METHOD_USER:
+            $this->URL_BASE = $this->USER_METHOD_URL_BASE;
+            break;
+        case self::METHOD_SITE:
+            $this->URL_BASE = $this->SITE_METHOD_URL_BASE;
+            break;
+        default:
+            break;  //Stick to the default
+    }
   }
   
   /**
