@@ -190,7 +190,7 @@ abstract class Phirehose
             $this->URL_BASE = $this->USER_METHOD_URL_BASE;
             break;
         case self::METHOD_SITE:
-            $this->URL_BASE = $this->USER_METHOD_URL_BASE;
+            $this->URL_BASE = $this->SITE_METHOD_URL_BASE;
             break;
         default:
             break;  //Stick to the default
