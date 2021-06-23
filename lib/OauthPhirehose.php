@@ -28,9 +28,9 @@ abstract class OauthPhirehose extends Phirehose
     /**
     */
 	protected function prepareParameters($method = null, $url = null,
-		array $params)
+		array $params= [])
 	{
-		if (empty($method) || empty($url))
+		if (empty($method) || empty($url) || empty ($params) )
 			return false;
 
 		$oauth['oauth_consumer_key'] = $this->consumerKey?$this->consumerKey:TWITTER_CONSUMER_KEY;
