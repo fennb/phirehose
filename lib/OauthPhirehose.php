@@ -28,7 +28,7 @@ abstract class OauthPhirehose extends Phirehose
     /**
     */
 	protected function prepareParameters($method = null, $url = null,
-		array $params)
+		array $params= [])
 	{
 		if (empty($method) || empty($url))
 			return false;
