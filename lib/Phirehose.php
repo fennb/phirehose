@@ -52,6 +52,9 @@ abstract class Phirehose
   protected $filterChanged;
   protected $reconnect;
 
+  // Generic default params
+  protected $requestParams = array();
+
   /**
   * The number of tweets received per second in previous minute; calculated fresh
   * just before each call to statusUpdate()
@@ -196,6 +199,26 @@ abstract class Phirehose
             break;  //Stick to the default
     }
   }
+  
+  /**
+   * Add default param for the request
+   * Generic function if a special function do not exists (ie: setFollow, setLang )
+   * @param name and value
+   */
+  public function setRequestParam( $paramName, $paramValue )
+  {
+    $this->requestParams[ $paramName ] = $paramValue;
+    //  $this->filterChanged = TRUE;
+  }
+  
+  /**
+   * Returns an array of the default params for the request 
+   */
+  public function getRequestParams()
+  {
+    return $this->requestParams; 
+  }
+  
   
   /**
    * Returns public statuses from or in reply to a set of users. Mentions ("Hello @user!") and implicit replies
@@ -603,7 +626,8 @@ abstract class Phirehose
       $urlParts = parse_url($url);
       
       // Setup params appropriately
-      $requestParams=array();
+      // Init with default params
+      $requestParams = $this->requestParams;
       
       //$requestParams['delimited'] = 'length';    //No, we don't want this any more
 
